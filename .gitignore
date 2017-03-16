@@ -1,0 +1,4 @@
+.env/
+log/
+inproj/ghostdriver.log
+inproj/test.log

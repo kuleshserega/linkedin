@@ -1,3 +1,15 @@
+body {
+    background-color: #222222;
+    color: #ffffff;
+    font-family: "Lato","Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size: 15px;
+    line-height: 1.42857;
+}
+
+input, table {
+    color: #000;
+}
+
 .panel-heading {
     padding: 5px 15px;
 }
@@ -112,7 +124,7 @@ input.required {
 .logout{
     position: absolute;
     right: 25px;
-    top: 15px;
+    top: 12px;
 }
 
 thead {
@@ -132,7 +144,7 @@ thead {
     display: inline;
 }
 
-textarea:focus, input[type="file"]:focus, input[type="text"]:focus, input[type="email"]:focus, input[type="TextInput"]:focus, input[type="DateInput"]:focus, input[type="password"]:focus {
+input[type="text"]:focus, input[type="password"]:focus {
     border-color: #46b8da!important;
 }
 
@@ -143,7 +155,7 @@ textarea:focus, input[type="file"]:focus, input[type="text"]:focus, input[type="
 .block-header {
     height: 70px;
     position: fixed;
-    background-color: #3498db;
+    background-color: #375a7f;
     top: 0px;
     width: 100%;
     z-index: 100;
@@ -188,8 +200,7 @@ i.glyphicon, span.glyphicon {
 
 .btn-signin {
     width:48%!important;
-    float:left;
-    margin-right:4%;
+    margin: 0 auto;
 }
 
 .btn-signup {
@@ -201,13 +212,21 @@ i.glyphicon, span.glyphicon {
     width:47%!important;
 }
 
-.h3-proj {
+.h1-logo {
+    margin-top: 10px;
+}
+
+.h1-proj {
     width: 25%;
     float: left;
 }
 
+.margin-bottom-0 {
+    padding-bottom: 0px!important;
+}
+
 .search-proj-form {
-    width:420px;
+    width:500px;
     float:right;
     display:block;
 }
@@ -220,8 +239,12 @@ i.glyphicon, span.glyphicon {
     width: 110px!important;
 }
 
-.el-width-200 {
-    width: 200px!important;
+.el-width-300 {
+    width: 300px!important;
+}
+
+#id_username, #id_password {
+    width: 100%!important;
 }
 
 .clear {
@@ -234,6 +257,7 @@ i.glyphicon, span.glyphicon {
 
 .center {
     text-align: center;
+    display: block;
 }
 
 .highlight {
@@ -242,4 +266,20 @@ i.glyphicon, span.glyphicon {
 
 #id_files {
     height: auto;
+}
+
+a.head-white {
+    color: #ffffff;
+    text-decoration: none;
+    margin-left: 10px;
+    font-size: 30px;
+}
+
+.top-logo-img {
+    width: 45px;
+    margin-right: 5px;
+}
+
+table > tbody > tr:nth-child(even) {
+    background: #D1D0CE;
 }

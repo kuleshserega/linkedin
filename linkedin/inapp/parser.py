@@ -1,28 +1,22 @@
 # -*- coding: utf-8 -*-
 import re
-import logging
 from lxml import html
 
-import scrapy
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 
-from inproj.items import LinkedinItem
-from inproj.settings import LOGIN_LINKEDIN, PASSWORD_LINKEDIN, \
-    LINKEDIN_PAGE_TIMEOUT_LAODING
+from django.conf import settings
 
-logger = logging.getLogger(__name__)
+from models import LinkedinSearch, LinkedinSearchResult, STATE_FINISHED
 
 
-class LinkedinSpider(scrapy.Spider):
-    name = "linkedin"
-    allowed_domains = ["linkedin.com"]
-    start_urls = ['https://www.linkedin.com/uas/login?goback=&trk=hb_signin']
+class LinkedinParser(object):
+    login_url = 'https://www.linkedin.com/uas/login?goback=&trk=hb_signin'
 
-    BUTTON_XPATH = '//input[@type="submit"]'
+    LOGIN_BUTTON_XPATH = '//input[@type="submit"]'
 
     LINKEDIN_URL = 'https://www.linkedin.com/'
     BASE_URL = 'https://www.linkedin.com/%s'
@@ -32,7 +26,7 @@ class LinkedinSpider(scrapy.Spider):
         '?facetCurrentCompany=%s&page=%d'
 
     def __init__(self, search_term='adidas', *args, **kwargs):
-        super(LinkedinSpider, self).__init__(*args, **kwargs)
+        super(LinkedinParser, self).__init__(*args, **kwargs)
         self.search_term = search_term
         self.serch_company_url = self.BASE_URL % self.SEARCH_COMPANY_URL
         self.employees_list_url = self.BASE_URL % self.COMPANY_EMPLOYEES_URL
@@ -40,35 +34,41 @@ class LinkedinSpider(scrapy.Spider):
         self.browser = webdriver.PhantomJS()
         self.browser.set_window_size(1024, 768)
 
-    def parse(self, response):
+    def parse(self):
         # use selenium to authenticate and load linkedin page
-        self.browser.get(response.url)
+        self.browser.get(self.login_url)
         self._make_login()
 
-        self.browser.get(self.serch_company_url % self.search_term)
-        company_id = self._get_company_id()
-        print('company_id', company_id)
+        if re.match(r'\d+', self.search_term):
+            company_id = self.search_term
+        else:
+            self.browser.get(self.serch_company_url % self.search_term)
+            company_id = self._get_company_id()
 
-        yield scrapy.Request(
-            self.LINKEDIN_URL,
-            self._get_next_list_of_employees,
-            meta={'company_id': company_id, 'page': 1})
+        if company_id:
+            self.linkedin_search = LinkedinSearch(
+                companyId=company_id, search_company=self.search_term)
+            self.linkedin_search.save()
+
+        self._get_next_list_of_employees(company_id, 1)
 
     def _make_login(self):
         email = self.browser.find_element_by_id("session_key-login")
         password = self.browser.find_element_by_id("session_password-login")
 
-        email.send_keys(LOGIN_LINKEDIN)
-        password.send_keys(PASSWORD_LINKEDIN)
+        email.send_keys(settings.LOGIN_LINKEDIN)
+        password.send_keys(settings.PASSWORD_LINKEDIN)
 
-        button_login = self.browser.find_element_by_xpath(self.BUTTON_XPATH)
+        button_login = self.browser.find_element_by_xpath(
+            self.LOGIN_BUTTON_XPATH)
         button_login.click()
 
         try:
             element_present = EC.presence_of_element_located(
                 (By.ID, 'nav-settings__dropdown-trigger'))
-            WebDriverWait(self.browser, LINKEDIN_PAGE_TIMEOUT_LAODING).until(
-                element_present)
+            WebDriverWait(
+                self.browser, settings.LINKEDIN_PAGE_TIMEOUT_LAODING).until(
+                    element_present)
             print('User authentificated')
         except TimeoutException:
             print('Timed out waiting for page to load')
@@ -77,8 +77,9 @@ class LinkedinSpider(scrapy.Spider):
         try:
             element_present = EC.presence_of_element_located(
                 (By.CLASS_NAME, 'search-result__title'))
-            WebDriverWait(self.browser, LINKEDIN_PAGE_TIMEOUT_LAODING).until(
-                element_present)
+            WebDriverWait(
+                self.browser, settings.LINKEDIN_PAGE_TIMEOUT_LAODING).until(
+                    element_present)
         except TimeoutException:
             print('Timed out waiting for companies page to load')
 
@@ -92,42 +93,49 @@ class LinkedinSpider(scrapy.Spider):
         cid = re.search('\d+', company_link_html)
         return cid.group(0)
 
-    def _get_next_list_of_employees(self, response):
-        self._wait_for_page_is_loaded(response.meta)
+    def _get_next_list_of_employees(self, company_id, page):
+        self._wait_for_page_is_loaded(company_id, page)
 
         page_html = html.fromstring(self.browser.page_source)
         xp = '//li[contains(@class, "search-result__occluded-item")]'
         employees_list = page_html.xpath(xp)
 
+        items = []
         for employee in employees_list:
-            item = LinkedinItem()
             try:
-                item['full_name'] = employee.xpath(
+                full_name = employee.xpath(
                     './/span[contains(@class, "actor-name")]/text()')[0]
-                item['title'] = employee.xpath(
+                title = employee.xpath(
                     './/p[contains(@class, "subline-level-1")]/text()')[0]
+                items.append({'full_name': full_name, 'title': title})
             except Exception:
-                pass
+                print('Full name or title is not found')
 
-            print item
-            yield item
+        print 'PAGE:', page
+        print 'items:', items
+
+        empls = []
+        for item in items:
+            empls.append(LinkedinSearchResult(
+                search=self.linkedin_search,
+                full_name=item['full_name'],
+                title=item['title']))
+        LinkedinSearchResult.objects.bulk_create(empls)
 
         if employees_list:
-            yield scrapy.Request(
-                self.LINKEDIN_URL,
-                self._get_next_list_of_employees,
-                meta={
-                    'company_id': response.meta["company_id"],
-                    'page': response.meta["page"] + 1})
+            self._get_next_list_of_employees(company_id, page+1)
+        else:
+            self.linkedin_search.status = STATE_FINISHED
+            self.linkedin_search.save()
 
-    def _wait_for_page_is_loaded(self, meta):
-        self.browser.get(
-            self.employees_list_url % (meta["company_id"], meta["page"]))
+    def _wait_for_page_is_loaded(self, company_id, page):
+        self.browser.get(self.employees_list_url % (company_id, page))
         try:
             element_present = EC.presence_of_element_located(
                 (By.CLASS_NAME, 'msg-overlay-bubble-header__title'))
-            WebDriverWait(self.browser, LINKEDIN_PAGE_TIMEOUT_LAODING).until(
-                element_present)
+            WebDriverWait(
+                self.browser, settings.LINKEDIN_PAGE_TIMEOUT_LAODING).until(
+                    element_present)
         except TimeoutException:
             print('Timed out waiting for company employees page to load')
 
@@ -141,7 +149,8 @@ class LinkedinSpider(scrapy.Spider):
         try:
             element_present = EC.presence_of_element_located(
                 (By.XPATH, last_el_entry))
-            WebDriverWait(self.browser, LINKEDIN_PAGE_TIMEOUT_LAODING).until(
-                element_present)
+            WebDriverWait(
+                self.browser, settings.LINKEDIN_PAGE_TIMEOUT_LAODING).until(
+                    element_present)
         except TimeoutException:
             print('Timed out waiting for all employees to load')

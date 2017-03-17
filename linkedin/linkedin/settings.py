@@ -15,6 +15,15 @@ import os
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+LOGS_DIR = os.path.join(BASE_DIR, 'logs')
+
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+LOGIN_LINKEDIN = 'kulesh_serega@mail.ru'
+PASSWORD_LINKEDIN = '_adm1n_'
+
+LINKEDIN_PAGE_TIMEOUT_LAODING = 60
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.10/howto/deployment/checklist/
@@ -23,14 +32,16 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = '0h53+(q+e=&n%4h0hy%r4xfg*h2o4*l6cfy91j8jy6(2#+s^2i'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
+LOGIN_URL = '/login/'
 
 # Application definition
 
 INSTALLED_APPS = [
+    'django.contrib.sites',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -55,7 +66,7 @@ ROOT_URLCONF = 'linkedin.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': ['templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -114,8 +125,20 @@ USE_L10N = True
 
 USE_TZ = True
 
+SITE_ID = 1
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.10/howto/static-files/
 
+# root folder of project static files
+STATIC_ROOT = os.path.join(PROJECT_DIR, 'static')
+
 STATIC_URL = '/static/'
+
+# contain own static files in root folder that will be
+# collected from with python manage.py collectstatic command
+STATICFILES_DIRS = (
+    os.path.join(BASE_DIR, 'static'),
+)
+
+from settings_local import *

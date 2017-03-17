@@ -1,0 +1,35 @@
+from django import template
+
+register = template.Library()
+
+
+@register.filter
+def glyphicon_tags(value):
+    """
+    Get icons by fields name
+    """
+    tags = [
+        ('username', 'user'),
+    ]
+
+    if 'password' in value:
+        return 'lock'
+
+    for search, replace in tags:
+        value = value.replace(search, replace)
+
+    return value
+
+
+@register.filter
+def status_icons(value):
+    """
+        Get icons from statuses.
+    """
+    tags = {
+        1: 'glyphicon-repeat',
+        2: 'glyphicon-ok',
+        3: 'glyphicon-ban-circle',
+    }
+
+    return tags[value]

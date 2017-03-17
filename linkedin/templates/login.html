@@ -9,7 +9,7 @@
         <div class="panel-heading">
           <strong> Sign in </strong>
         </div>
-        <div class="panel-body">
+        <div class="panel-body margin-bottom-0">
           <form role="form" action="{% url 'inapp:login' %}" method="POST">
             {% csrf_token %}
             {% if form.non_field_errors or form.this_is_the_login_form.errors %}
@@ -34,7 +34,7 @@
                     </div>
                   {% endfor %}
                   <div class="form-group">
-                    <input type="submit" class="btn btn-lg btn-info btn-block btn-signin" value="Login">
+                    <input type="submit" class="btn btn-lg btn-primary btn-block btn-signin" value="Login">
                   </div>
                 </div>
               </div>

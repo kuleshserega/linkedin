@@ -6,7 +6,7 @@ urlpatterns = [
     url(r'^$', views.LinkedinSearchView.as_view(), name='search'),
     url(r'^login/$', views.LoginFormView.as_view(), name='login'),
     url(r'^logout/$', views.LogoutView.as_view(), name='logout'),
-    url(r'^search-results/(?P<pk>[0-9]+)/$',
-        views.SearchDetailView.as_view(),
-        name='search_results'),
+    url(r'^search-details/(?P<pk>[0-9]+)/$',
+        views.SearchDetailsView.as_view(), name='search-details'),
+    url(r'^run-search/$', views.make_linkedin_search, name='runsearch'),
 ]

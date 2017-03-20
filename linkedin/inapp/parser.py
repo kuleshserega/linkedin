@@ -10,7 +10,8 @@ from selenium.webdriver.common.by import By
 
 from django.conf import settings
 
-from models import LinkedinSearch, LinkedinSearchResult, STATE_FINISHED
+from models import LinkedinSearch, LinkedinSearchResult, \
+    STATE_FINISHED, STATE_ERROR
 
 
 class LinkedinParser(object):
@@ -98,19 +99,13 @@ class LinkedinParser(object):
         self._wait_for_page_is_loaded(company_id, page)
 
         page_html = html.fromstring(self.browser.page_source)
+
         xp = '//li[contains(@class, "search-result__occluded-item")]'
         employees_list = page_html.xpath(xp)
 
-        items = []
-        for employee in employees_list:
-            try:
-                full_name = employee.xpath(
-                    './/span[contains(@class, "actor-name")]/text()')[0]
-                title = employee.xpath(
-                    './/p[contains(@class, "subline-level-1")]/text()')[0]
-                items.append({'full_name': full_name, 'title': title})
-            except Exception:
-                print('Full name or title is not found')
+        items = self._get_items(employees_list)
+        if not isinstance(items, list):
+            return None
 
         empls = []
         for item in items:
@@ -125,6 +120,27 @@ class LinkedinParser(object):
         else:
             self.linkedin_search.status = STATE_FINISHED
             self.linkedin_search.save()
+
+    def _get_items(self, employees_list):
+        items = []
+        for employee in employees_list:
+            try:
+                try_premium_exists = employee.xpath(
+                    './/div[contains(@class, "search-paywall__warning")]')
+                if try_premium_exists:
+                    self.linkedin_search.status = STATE_ERROR
+                    self.linkedin_search.save()
+                    return None
+
+                full_name = employee.xpath(
+                    './/span[contains(@class, "actor-name")]/text()')[0]
+                title = employee.xpath(
+                    './/p[contains(@class, "subline-level-1")]/text()')[0]
+                items.append({'full_name': full_name, 'title': title})
+            except Exception:
+                print('Full name or title is not found')
+        print('Add %d items' % len(items))
+        return items
 
     def _wait_for_page_is_loaded(self, company_id, page):
         self.browser.get(self.employees_list_url % (company_id, page))

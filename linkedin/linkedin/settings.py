@@ -24,6 +24,7 @@ PASSWORD_LINKEDIN = '_adm1n_'
 
 LINKEDIN_PAGE_TIMEOUT_LAODING = 60
 
+ROWS_ON_PAGE = 15
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.10/howto/deployment/checklist/

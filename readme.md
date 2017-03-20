@@ -1,2 +1,4 @@
-Used technologies:
-    Scrapy
+LINKEDIN PARSER:
+
+Used technologies: Django, Selenium, Celery
+Used DB: PostgreSQL

@@ -89,6 +89,7 @@ class LinkedinParser(object):
             company_link_html = search_page_html.xpath(xp)[0]
         except IndexError:
             print('Search page has no company link')
+            return None
 
         cid = re.search('\d+', company_link_html)
         return cid.group(0)
@@ -110,9 +111,6 @@ class LinkedinParser(object):
                 items.append({'full_name': full_name, 'title': title})
             except Exception:
                 print('Full name or title is not found')
-
-        print 'PAGE:', page
-        print 'items:', items
 
         empls = []
         for item in items:

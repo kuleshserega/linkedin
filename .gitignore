@@ -1,4 +1,4 @@
 .env/
-log/
-inproj/ghostdriver.log
-inproj/test.log
+linkedin/logs/
+linkedin/ghostdriver.log
+*.pyc

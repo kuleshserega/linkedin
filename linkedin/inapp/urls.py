@@ -9,4 +9,8 @@ urlpatterns = [
     url(r'^search-details/(?P<pk>[0-9]+)/$',
         views.SearchDetailsView.as_view(), name='search-details'),
     url(r'^run-search/$', views.make_linkedin_search, name='runsearch'),
+    url(r'^get_employees/(?P<pk>[0-9]+)/$',
+        views.get_linkedin_employees_csv, name='get-employees'),
+    url(r'^get_companies_list/$',
+        views.get_companies_list, name='get-companies-list'),
 ]

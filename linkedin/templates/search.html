@@ -3,6 +3,7 @@
 {% block title %}Search by linkedin company{% endblock %}
 {% block head %}
   {{ block.super }}
+  <script type="text/javascript" src="{% static 'js/search_page.js' %}"></script>
   <script type="text/javascript" src="{% static 'js/highlight.jquery.js' %}"></script>
 {% endblock %}
 {% block content %}
@@ -11,7 +12,7 @@
     <div>
       <h1 class="h1-proj">Search list</h1>
       <form class="search-proj-form" action="{% url 'inapp:runsearch' %}" method="GET">
-        <input type="submit" class="btn btn-lg btn-primary btn-block search_buttons el-width-110" value="SEARCH" />
+        <input id="searchbtn" type="submit" class="btn btn-lg btn-primary btn-block search_buttons el-width-110" value="SEARCH" />
         <input id="id_search" class="form-control search_buttons el-width-300" autocomplete="off" placeholder="Search by company name or company ID" name="search" value="{% if request.GET.search %}{{ request.GET.search }}{% endif %}" type="text" />
       </form>
     </div>
@@ -28,17 +29,17 @@
             <th>Save to CSV</th>
           </tr>
         </thead>
-          {% for result in results %}
-            <tr>
-              <td>{{ result.id }}</td>
-              <td>{{ result.search_company }}</td>
-              <td>{{ result.companyId }}</td>
-              <td>{{ result.date_created }}</td>
-              <td><span title="{{ result.get_status_display }}" class="center glyphicon {{ result.status|status_icons }}"></span></td>
-              <td><a title="Search details" class="center" href="{% url 'inapp:search-details' result.id %}"><img width=25 src="{% static 'img/details.png' %}" /></a></td>
-              <td><a title="Save to CSV" class="center" href="#"><img width=25 src="{% static 'img/save.png' %}" /></a></td>
-            </tr>
-          {% endfor %}
+        {% for result in results %}
+          <tr>
+            <td>{{ result.id }}</td>
+            <td>{{ result.search_company }}</td>
+            <td>{{ result.companyId }}</td>
+            <td>{{ result.date_created|date:'Y-m-d H:i:s' }}</td>
+            <td><span title="{{ result.get_status_display }}" class="center glyphicon {{ result.status|status_icons }}"></span></td>
+            <td><a title="Search details" class="center" href="{% url 'inapp:search-details' result.id %}"><img width=25 src="{% static 'img/details.png' %}" /></a></td>
+            <td><a title="Save to CSV" class="center" href="{% url 'inapp:get-employees' result.id %}"><img width=25 src="{% static 'img/save.png' %}" /></a></td>
+          </tr>
+        {% endfor %}
       </table>
     {% else %}
       <div class="clear">

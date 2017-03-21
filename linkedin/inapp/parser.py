@@ -9,8 +9,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 
 from django.conf import settings
+from django.utils.http import urlquote
 
-from models import LinkedinSearch, LinkedinSearchResult, \
+from models import LinkedinSearch, LinkedinSearchResult, LinkedinUser, \
     STATE_FINISHED, STATE_ERROR
 
 
@@ -32,23 +33,37 @@ class LinkedinParser(object):
         self.serch_company_url = self.BASE_URL % self.SEARCH_COMPANY_URL
         self.employees_list_url = self.BASE_URL % self.COMPANY_EMPLOYEES_URL
 
+        self.email, self.password = self._get_linkedin_user()
+
         self.browser = webdriver.PhantomJS()
         self.browser.set_window_size(1024, 768)
+
+    def _get_linkedin_user(self):
+        qs = LinkedinUser.objects.all()
+        if qs:
+            return qs[0].email, qs[0].password
+        return None, None
 
     def parse(self):
         # use selenium to authenticate and load linkedin page
         self.browser.get(self.login_url)
         self._make_login()
 
-        if re.match(r'\d+', self.search_term):
+        if re.match(r'\d+$', self.search_term.encode('utf-8')):
             company_id = self.search_term
         else:
-            self.browser.get(self.serch_company_url % self.search_term)
+            self.browser.get(
+                self.serch_company_url % urlquote(self.search_term))
             company_id = self._get_company_id()
 
-        if company_id:
-            self.linkedin_search = LinkedinSearch(
-                companyId=company_id, search_company=self.search_term)
+        self.linkedin_search = LinkedinSearch(
+            companyId=company_id, search_company=self.search_term)
+
+        if not company_id:
+            self.linkedin_search.status = STATE_ERROR
+            self.linkedin_search.save()
+            return None
+        else:
             self.linkedin_search.save()
 
         self._get_next_list_of_employees(company_id, 1)
@@ -57,8 +72,8 @@ class LinkedinParser(object):
         email = self.browser.find_element_by_id("session_key-login")
         password = self.browser.find_element_by_id("session_password-login")
 
-        email.send_keys(settings.LOGIN_LINKEDIN)
-        password.send_keys(settings.PASSWORD_LINKEDIN)
+        email.send_keys(self.email)
+        password.send_keys(self.password)
 
         button_login = self.browser.find_element_by_xpath(
             self.LOGIN_BUTTON_XPATH)
@@ -85,6 +100,7 @@ class LinkedinParser(object):
             print('Timed out waiting for companies page to load')
 
         search_page_html = html.fromstring(self.browser.page_source)
+
         xp = '(//a[contains(@class, "search-result__result-link")]/@href)[1]'
         try:
             company_link_html = search_page_html.xpath(xp)[0]
@@ -140,6 +156,7 @@ class LinkedinParser(object):
                 items.append({'full_name': full_name, 'title': title})
             except Exception:
                 print('Full name or title is not found')
+
         print('Add %d items' % len(items))
         return items
 

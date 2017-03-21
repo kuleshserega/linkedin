@@ -19,9 +19,6 @@ LOGS_DIR = os.path.join(BASE_DIR, 'logs')
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-LOGIN_LINKEDIN = 'sergey.koval-serg@yandex.ru'
-PASSWORD_LINKEDIN = '_admin_'
-
 LINKEDIN_PAGE_TIMEOUT_LAODING = 60
 
 ROWS_ON_PAGE = 15

@@ -41,10 +41,14 @@ $(document).ready(function(){
             method: 'GET',
             success: function(data){
                 for (var i=0;i<data['content'].length;i++){
+                    var companyId = '';
+                    if(data['content'][i]['companyId']){
+                        companyId = data['content'][i]['companyId'];
+                    }
                     tbody_html += '<tr>' +
                         '<td>' + data['content'][i]['id'] + '</td>' +
                         '<td>' + data['content'][i]['search_company'] + '</td>' +
-                        '<td>' + data['content'][i]['companyId'] + '</td>' +
+                        '<td>' + companyId + '</td>' +
                         '<td>' + data['content'][i]['date_created'] + '</td>' +
                         '<td><span title="' + data['content'][i]['status_text'] + '" class="center glyphicon ' + data['content'][i]['status_icon'] + '"></span></td>' +
                         '<td><a title="Search details" target="_blank" class="center" href="' + data['content'][i]['search_details_url'] + '"><img width=25 src="/static/img/details.png" /></a></td>' +

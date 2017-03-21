@@ -32,3 +32,10 @@ class LinkedinSearchResult(models.Model):
         max_length=250, verbose_name=_('Title'))
     search = models.ForeignKey(
         'LinkedinSearch', verbose_name=_('Linkedin Search instance'))
+
+
+class LinkedinUser(models.Model):
+    email = models.CharField(
+        max_length=120, verbose_name=_('Linkedin email'))
+    password = models.CharField(
+        max_length=120, verbose_name=_('Linkedin password'))

@@ -93,7 +93,7 @@ def get_linkedin_employees_csv(request, pk):
 
     writer = csv.writer(response)
 
-    qs = LinkedinSearchResult.objects.filter(search_id=s.id)
+    qs = LinkedinSearchResult.objects.filter(search_id=s.id).order_by('id')
 
     writer.writerow(['ID SEARCH RESULT', 'FULL NAME', 'TITLE'])
     for row in qs:

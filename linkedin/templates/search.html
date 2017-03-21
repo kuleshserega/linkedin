@@ -33,7 +33,7 @@
           <tr>
             <td>{{ result.id }}</td>
             <td>{{ result.search_company }}</td>
-            <td>{{ result.companyId }}</td>
+            <td>{% if result.companyId %}{{ result.companyId }}{% endif %}</td>
             <td>{{ result.date_created|date:'Y-m-d H:i:s' }}</td>
             <td><span title="{{ result.get_status_display }}" class="center glyphicon {{ result.status|status_icons }}"></span></td>
             <td><a title="Search details" target="_blank" class="center" href="{% url 'inapp:search-details' result.id %}"><img width=25 src="{% static 'img/details.png' %}" /></a></td>

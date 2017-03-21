@@ -118,8 +118,9 @@ class LinkedinParser(object):
         if employees_list:
             self._get_next_list_of_employees(company_id, page+1)
         else:
-            self.linkedin_search.status = STATE_FINISHED
-            self.linkedin_search.save()
+            if hasattr(self, 'linkedin_search'):
+                self.linkedin_search.status = STATE_FINISHED
+                self.linkedin_search.save()
 
     def _get_items(self, employees_list):
         items = []

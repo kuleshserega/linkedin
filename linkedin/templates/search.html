@@ -36,7 +36,7 @@
             <td>{{ result.companyId }}</td>
             <td>{{ result.date_created|date:'Y-m-d H:i:s' }}</td>
             <td><span title="{{ result.get_status_display }}" class="center glyphicon {{ result.status|status_icons }}"></span></td>
-            <td><a title="Search details" class="center" href="{% url 'inapp:search-details' result.id %}"><img width=25 src="{% static 'img/details.png' %}" /></a></td>
+            <td><a title="Search details" target="_blank" class="center" href="{% url 'inapp:search-details' result.id %}"><img width=25 src="{% static 'img/details.png' %}" /></a></td>
             <td><a title="Save to CSV" class="center" href="{% url 'inapp:get-employees' result.id %}"><img width=25 src="{% static 'img/save.png' %}" /></a></td>
           </tr>
         {% endfor %}

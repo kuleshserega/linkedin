@@ -60,7 +60,8 @@ class SearchDetailsView(LoginRequiredMixin, ListView):
     paginate_by = 15
 
     def get_queryset(self):
-        return LinkedinSearchResult.objects.filter(search_id=self.kwargs['pk'])
+        return LinkedinSearchResult.objects.filter(
+            search_id=self.kwargs['pk']).order_by('id')
 
     def get_context_data(self, **kwargs):
         data = super(SearchDetailsView, self).get_context_data(**kwargs)

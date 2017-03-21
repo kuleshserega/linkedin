@@ -47,7 +47,7 @@ $(document).ready(function(){
                         '<td>' + data['content'][i]['companyId'] + '</td>' +
                         '<td>' + data['content'][i]['date_created'] + '</td>' +
                         '<td><span title="' + data['content'][i]['status_text'] + '" class="center glyphicon ' + data['content'][i]['status_icon'] + '"></span></td>' +
-                        '<td><a title="Search details" class="center" href="' + data['content'][i]['search_details_url'] + '"><img width=25 src="/static/img/details.png" /></a></td>' +
+                        '<td><a title="Search details" target="_blank" class="center" href="' + data['content'][i]['search_details_url'] + '"><img width=25 src="/static/img/details.png" /></a></td>' +
                         '<td><a title="Save to CSV" class="center" href="' + data['content'][i]['employees_to_csv'] + '"><img width=25 src="/static/img/save.png" /></a></td>' +
                     '</tr>';
                 }

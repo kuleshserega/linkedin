@@ -49,6 +49,9 @@ class LinkedinParser(object):
         self.browser.get(self.login_url)
         self._make_login()
 
+        # set company id depending what user entered in the search
+        # if only numbers then set value as company id
+        # if not then set search_term as company name
         if re.match(r'\d+$', self.search_term.encode('utf-8')):
             company_id = self.search_term
         else:

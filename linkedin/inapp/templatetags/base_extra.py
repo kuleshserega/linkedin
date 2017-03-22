@@ -33,3 +33,21 @@ def status_icons(value):
     }
 
     return tags[value]
+
+
+@register.filter
+def messages_alert_tags(value):
+    """
+        Get alerts class from alerts type
+    """
+    tags = [
+        ('error', 'danger'),
+        ('info', 'info'),
+        ('success', 'success'),
+        ('warning', 'warning')
+    ]
+
+    for search, replace in tags:
+        value = value.replace(search, replace)
+
+    return value

@@ -10,12 +10,11 @@ from django.contrib.auth import login
 from django.contrib.auth import logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.http.response import JsonResponse
-from django.core.urlresolvers import reverse
+from django.contrib import messages
 from django.conf import settings
 
 from inapp.models import LinkedinSearch, LinkedinSearchResult
 from inapp.tasks import create_linkedin_search
-from templatetags.base_extra import status_icons
 
 
 class LoginFormView(FormView):
@@ -68,8 +67,10 @@ class SearchDetailsView(LoginRequiredMixin, ListView):
         try:
             data['search_info'] = LinkedinSearch.objects.get(
                 pk=self.kwargs['pk'])
-        except Exception:
-            print('Search not exists in database')
+        except LinkedinSearch.DoesNotExist:
+            data['search_info'] = []
+            messages.error(
+                self.request, 'Search details does not exists in database.')
 
         return data
 
@@ -78,7 +79,7 @@ def make_linkedin_search(request):
     search_term = request.GET.get('search')
     create_linkedin_search.delay(search_term)
 
-    return JsonResponse({'status': 'ok', 'parser': 'running'})
+    return JsonResponse({'status': 'success', 'msg': 'Linkedin search added'})
 
 
 def get_linkedin_employees_csv(request, pk):
@@ -117,18 +118,6 @@ def get_companies_list(request):
 
     result = []
     for line in qs:
-        date_created = line.date_created.strftime("%Y-%m-%d %H:%M:%S")
-        result.append({
-            'id': line.id,
-            'search_company': line.search_company,
-            'date_created': date_created,
-            'companyId': line.companyId,
-            'status_text': line.get_status_display(),
-            'status_icon': status_icons(line.status),
-            'search_details_url': reverse(
-                'inapp:search-details', kwargs={'pk': line.id}),
-            'employees_to_csv': reverse(
-                'inapp:get-employees', kwargs={'pk': line.id}),
-        })
+        result.append(line.as_dict())
 
     return JsonResponse({'status': 'ok', 'content': result})

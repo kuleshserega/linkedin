@@ -2,6 +2,9 @@ from __future__ import unicode_literals
 
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
+from django.core.urlresolvers import reverse
+
+from templatetags.base_extra import status_icons
 
 STATE_IN_PROCESS = 1
 STATE_FINISHED = 2
@@ -23,6 +26,22 @@ class LinkedinSearch(models.Model):
         auto_now_add=True, verbose_name=_('Date created'))
     status = models.SmallIntegerField(
         default=1, choices=STATUS_CHOICES, verbose_name=_('Status of search'))
+
+    def as_dict(self):
+        date_created = self.date_created.strftime("%Y-%m-%d %H:%M:%S")
+        result = {
+            'id': self.id,
+            'search_company': self.search_company,
+            'date_created': date_created,
+            'companyId': self.companyId,
+            'status_text': self.get_status_display(),
+            'status_icon': status_icons(self.status),
+            'search_details_url': reverse(
+                'inapp:search-details', kwargs={'pk': self.id}),
+            'employees_to_csv': reverse(
+                'inapp:get-employees', kwargs={'pk': self.id}),
+        }
+        return result
 
 
 class LinkedinSearchResult(models.Model):

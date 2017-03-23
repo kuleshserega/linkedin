@@ -9,11 +9,13 @@ from templatetags.base_extra import status_icons
 STATE_IN_PROCESS = 1
 STATE_FINISHED = 2
 STATE_ERROR = 3
+STATE_NOT_LOGGED_IN = 4
 
 STATUS_CHOICES = (
     (STATE_IN_PROCESS, _('Search in process')),
     (STATE_FINISHED, _('Search is finished')),
     (STATE_ERROR, _('Search has errors')),
+    (STATE_NOT_LOGGED_IN, _('Linkedin user is not logged in')),
 )
 
 

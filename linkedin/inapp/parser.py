@@ -12,7 +12,7 @@ from django.conf import settings
 from django.utils.http import urlquote
 
 from models import LinkedinSearch, LinkedinSearchResult, LinkedinUser, \
-    STATE_FINISHED, STATE_ERROR
+    STATE_FINISHED, STATE_ERROR, STATE_NOT_LOGGED_IN
 
 
 class LinkedinParser(object):
@@ -47,7 +47,12 @@ class LinkedinParser(object):
     def parse(self):
         # use selenium to authenticate and load linkedin page
         self.browser.get(self.login_url)
-        self._make_login()
+        logged_in = self._make_login()
+        if not logged_in:
+            LinkedinSearch(
+                search_company=self.search_term,
+                status=STATE_NOT_LOGGED_IN).save()
+            return None
 
         # set company id depending what user entered in the search
         # if only numbers then set value as company id
@@ -90,7 +95,8 @@ class LinkedinParser(object):
                     element_present)
             print('User authentificated')
         except TimeoutException:
-            print('Timed out waiting for page to load')
+            print('Timed out waiting for user login')
+            return None
 
     def _get_company_id(self):
         try:

@@ -30,6 +30,7 @@ def status_icons(value):
         1: 'glyphicon-repeat',
         2: 'glyphicon-ok',
         3: 'glyphicon-ban-circle',
+        4: 'glyphicon-user',
     }
 
     return tags[value]

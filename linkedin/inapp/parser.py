@@ -98,6 +98,8 @@ class LinkedinParser(object):
             print('Timed out waiting for user login')
             return None
 
+        return True
+
     def _get_company_id(self):
         try:
             element_present = EC.presence_of_element_located(

@@ -52,7 +52,7 @@ class LinkedinParser(object):
             LinkedinSearch(
                 search_company=self.search_term,
                 status=STATE_NOT_LOGGED_IN).save()
-            return None
+            return self._close_browser()
 
         # set company id depending what user entered in the search
         # if only numbers then set value as company id
@@ -70,11 +70,17 @@ class LinkedinParser(object):
         if not company_id:
             self.linkedin_search.status = STATE_ERROR
             self.linkedin_search.save()
-            return None
+            return self._close_browser()
         else:
             self.linkedin_search.save()
 
         self._get_next_list_of_employees(company_id, 1)
+
+        return self._close_browser()
+
+    def _close_browser(self):
+        self.browser.close()
+        return None
 
     def _make_login(self):
         email = self.browser.find_element_by_id("session_key-login")

@@ -79,7 +79,7 @@ class LinkedinParser(object):
         return self._close_browser()
 
     def _close_browser(self):
-        self.browser.close()
+        self.browser.quit()
         return None
 
     def _make_login(self):

@@ -11,7 +11,8 @@ STATE_FINISHED = 2
 STATE_ERROR = 3
 STATE_NOT_LOGGED_IN = 4
 STATE_AUTHENTICATED = 5
-STATE_NOT_VALID_CODE = 6
+STATE_ASKS_CODE = 6
+STATE_CODE_NOT_VALID = 7
 
 
 STATUS_CHOICES = (
@@ -20,7 +21,8 @@ STATUS_CHOICES = (
     (STATE_ERROR, _('Search has errors')),
     (STATE_NOT_LOGGED_IN, _('Linkedin user is not logged in')),
     (STATE_AUTHENTICATED, _('Linkedin user has been authenticated')),
-    (STATE_NOT_VALID_CODE, _('Linkedin verification code is not valid')),
+    (STATE_ASKS_CODE, _('Linkedin asks verification code')),
+    (STATE_CODE_NOT_VALID, _('Linkedin verification code is not valid')),
 )
 
 

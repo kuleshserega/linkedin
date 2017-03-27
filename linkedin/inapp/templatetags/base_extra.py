@@ -33,6 +33,7 @@ def status_icons(value):
         4: 'glyphicon-user',
         5: 'glyphicon-home',
         6: 'glyphicon-question-sign',
+        7: 'glyphicon-remove',
     }
 
     return tags[value]

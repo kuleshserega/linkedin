@@ -14,7 +14,7 @@ from django.utils.http import urlquote
 
 from models import LinkedinSearch, LinkedinSearchResult, LinkedinUser, \
     STATE_FINISHED, STATE_ERROR, STATE_NOT_LOGGED_IN, STATE_AUTHENTICATED, \
-    STATE_NOT_VALID_CODE
+    STATE_ASKS_CODE, STATE_CODE_NOT_VALID
 
 
 class LinkedinParser(object):
@@ -51,12 +51,14 @@ class LinkedinParser(object):
     def parse(self):
         # use selenium to authenticate and load linkedin page
         self.browser.get(self.login_url)
+        self.linkedin_search = LinkedinSearch(search_company=self.search_term)
+
         login_status = self._make_login()
+        self.linkedin_search.status = login_status
+        self.linkedin_search.save()
+
         if login_status == STATE_AUTHENTICATED:
             self._make_search()
-        else:
-            LinkedinSearch(
-                search_company=self.search_term, status=login_status).save()
 
         self.browser.quit()
 
@@ -75,9 +77,12 @@ class LinkedinParser(object):
         if not is_authenticated:
             asks_verification = self._asks_code_verification()
             if asks_verification:
+                self.linkedin_search.status = STATE_ASKS_CODE
+                self.linkedin_search.save()
+
                 verified = self._substitute_verification_code()
                 if not verified:
-                    return STATE_NOT_VALID_CODE
+                    return STATE_CODE_NOT_VALID
             else:
                 return STATE_NOT_LOGGED_IN
 
@@ -94,8 +99,8 @@ class LinkedinParser(object):
                 self.serch_company_url % urlquote(self.search_term))
             company_id = self._get_company_id()
 
-        self.linkedin_search = LinkedinSearch(
-            companyId=company_id, search_company=self.search_term)
+        self.linkedin_search.companyId = company_id
+        self.linkedin_search.search_company=self.search_term
 
         if not company_id:
             self.linkedin_search.status = STATE_ERROR
@@ -138,17 +143,20 @@ class LinkedinParser(object):
         return True
 
     def _substitute_verification_code(self):
-        if self.user.verification_code:
-            verification_code = self.browser.find_element_by_id("verification-code")
-            verification_code.send_keys(self.user.verification_code)
+        print('Begin waiting for user set verification code')
+        time.sleep(120)
+        print('End waiting')
 
-            code_verification_button = self.browser.find_element_by_xpath(
-                self.VERIFICATION_BUTTON_XPATH)
-            code_verification_button.click()
+        self.user = self._get_linkedin_user()
 
-            return self._is_user_auth()
-        else:
-            return False
+        verification_code = self.browser.find_element_by_id("verification-code")
+        verification_code.send_keys(self.user.verification_code)
+
+        code_verification_button = self.browser.find_element_by_xpath(
+            self.VERIFICATION_BUTTON_XPATH)
+        code_verification_button.click()
+
+        return self._is_user_auth()
 
     def _get_company_id(self):
         try:

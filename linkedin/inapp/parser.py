@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import re
 from lxml import html
+import time
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
@@ -12,13 +13,16 @@ from django.conf import settings
 from django.utils.http import urlquote
 
 from models import LinkedinSearch, LinkedinSearchResult, LinkedinUser, \
-    STATE_FINISHED, STATE_ERROR, STATE_NOT_LOGGED_IN
+    STATE_FINISHED, STATE_ERROR, STATE_NOT_LOGGED_IN, STATE_AUTHENTICATED, \
+    STATE_NOT_VALID_CODE
 
 
 class LinkedinParser(object):
     login_url = 'https://www.linkedin.com/uas/login?goback=&trk=hb_signin'
 
     LOGIN_BUTTON_XPATH = '//input[@type="submit"]'
+
+    VERIFICATION_BUTTON_XPATH = '//input[@type="submit"]'
 
     LINKEDIN_URL = 'https://www.linkedin.com/'
     BASE_URL = 'https://www.linkedin.com/%s'
@@ -33,7 +37,7 @@ class LinkedinParser(object):
         self.serch_company_url = self.BASE_URL % self.SEARCH_COMPANY_URL
         self.employees_list_url = self.BASE_URL % self.COMPANY_EMPLOYEES_URL
 
-        self.email, self.password = self._get_linkedin_user()
+        self.user = self._get_linkedin_user()
 
         self.browser = webdriver.PhantomJS()
         self.browser.set_window_size(1024, 768)
@@ -41,19 +45,45 @@ class LinkedinParser(object):
     def _get_linkedin_user(self):
         qs = LinkedinUser.objects.all()
         if qs:
-            return qs[0].email, qs[0].password
-        return None, None
+            return qs[0]
+        return None
 
     def parse(self):
         # use selenium to authenticate and load linkedin page
         self.browser.get(self.login_url)
-        logged_in = self._make_login()
-        if not logged_in:
+        login_status = self._make_login()
+        if login_status == STATE_AUTHENTICATED:
+            self._make_search()
+        else:
             LinkedinSearch(
-                search_company=self.search_term,
-                status=STATE_NOT_LOGGED_IN).save()
-            return self._close_browser()
+                search_company=self.search_term, status=login_status).save()
 
+        self.browser.quit()
+
+    def _make_login(self):
+        email = self.browser.find_element_by_id("session_key-login")
+        password = self.browser.find_element_by_id("session_password-login")
+
+        email.send_keys(self.user.email)
+        password.send_keys(self.user.password)
+
+        button_login = self.browser.find_element_by_xpath(
+            self.LOGIN_BUTTON_XPATH)
+        button_login.click()
+
+        is_authenticated = self._is_user_auth()
+        if not is_authenticated:
+            asks_verification = self._asks_code_verification()
+            if asks_verification:
+                verified = self._substitute_verification_code()
+                if not verified:
+                    return STATE_NOT_VALID_CODE
+            else:
+                return STATE_NOT_LOGGED_IN
+
+        return STATE_AUTHENTICATED
+
+    def _make_search(self):
         # set company id depending what user entered in the search
         # if only numbers then set value as company id
         # if not then set search_term as company name
@@ -70,29 +100,12 @@ class LinkedinParser(object):
         if not company_id:
             self.linkedin_search.status = STATE_ERROR
             self.linkedin_search.save()
-            return self._close_browser()
         else:
             self.linkedin_search.save()
 
         self._get_next_list_of_employees(company_id, 1)
 
-        return self._close_browser()
-
-    def _close_browser(self):
-        self.browser.quit()
-        return None
-
-    def _make_login(self):
-        email = self.browser.find_element_by_id("session_key-login")
-        password = self.browser.find_element_by_id("session_password-login")
-
-        email.send_keys(self.email)
-        password.send_keys(self.password)
-
-        button_login = self.browser.find_element_by_xpath(
-            self.LOGIN_BUTTON_XPATH)
-        button_login.click()
-
+    def _is_user_auth(self):
         try:
             element_present = EC.presence_of_element_located(
                 (By.ID, 'nav-settings__dropdown-trigger'))
@@ -100,11 +113,42 @@ class LinkedinParser(object):
                 self.browser, settings.LINKEDIN_PAGE_TIMEOUT_LAODING).until(
                     element_present)
             print('User authentificated')
+            with open(str(time.time()), 'w') as f:
+                f.write(self.browser.page_source.encode('utf-8'))
         except TimeoutException:
+            with open(str(time.time()), 'w') as f:
+                f.write(self.browser.page_source.encode('utf-8'))
             print('Timed out waiting for user login')
-            return None
+            return False
 
         return True
+
+    def _asks_code_verification(self):
+        try:
+            element_present = EC.presence_of_element_located(
+                (By.ID, 'verification-code'))
+            WebDriverWait(
+                self.browser, settings.LINKEDIN_PAGE_TIMEOUT_LAODING).until(
+                    element_present)
+            print('Linkedin verification code asked')
+        except TimeoutException:
+            print('Timed out waiting for linkedin verification page')
+            return False
+
+        return True
+
+    def _substitute_verification_code(self):
+        if self.user.verification_code:
+            verification_code = self.browser.find_element_by_id("verification-code")
+            verification_code.send_keys(self.user.verification_code)
+
+            code_verification_button = self.browser.find_element_by_xpath(
+                self.VERIFICATION_BUTTON_XPATH)
+            code_verification_button.click()
+
+            return self._is_user_auth()
+        else:
+            return False
 
     def _get_company_id(self):
         try:

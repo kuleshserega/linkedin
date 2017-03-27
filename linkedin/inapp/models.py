@@ -10,12 +10,17 @@ STATE_IN_PROCESS = 1
 STATE_FINISHED = 2
 STATE_ERROR = 3
 STATE_NOT_LOGGED_IN = 4
+STATE_AUTHENTICATED = 5
+STATE_NOT_VALID_CODE = 6
+
 
 STATUS_CHOICES = (
     (STATE_IN_PROCESS, _('Search in process')),
     (STATE_FINISHED, _('Search is finished')),
     (STATE_ERROR, _('Search has errors')),
     (STATE_NOT_LOGGED_IN, _('Linkedin user is not logged in')),
+    (STATE_AUTHENTICATED, _('Linkedin user has been authenticated')),
+    (STATE_NOT_VALID_CODE, _('Linkedin verification code is not valid')),
 )
 
 
@@ -60,3 +65,6 @@ class LinkedinUser(models.Model):
         max_length=120, verbose_name=_('Linkedin email'))
     password = models.CharField(
         max_length=120, verbose_name=_('Linkedin password'))
+    verification_code = models.CharField(
+        default=None, null=True, max_length=30,
+        verbose_name=_('Linkedin verification code'))

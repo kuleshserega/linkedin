@@ -21,7 +21,7 @@ PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 LINKEDIN_PAGE_TIMEOUT_LAODING = 60
 
-ROWS_ON_PAGE = 15
+ROWS_ON_PAGE = 10
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.10/howto/deployment/checklist/

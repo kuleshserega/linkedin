@@ -44,7 +44,7 @@ class LinkedinSearchView(LoginRequiredMixin, ListView):
     model = LinkedinSearch
     template_name = 'search.html'
     context_object_name = 'results'
-    paginate_by = 15
+    paginate_by = settings.ROWS_ON_PAGE
 
     def get_queryset(self):
         qs = super(LinkedinSearchView, self).get_queryset().order_by(
@@ -56,7 +56,7 @@ class SearchDetailsView(LoginRequiredMixin, ListView):
     model = LinkedinSearchResult
     template_name = 'search-details.html'
     context_object_name = 'employees'
-    paginate_by = 15
+    paginate_by = settings.ROWS_ON_PAGE
 
     def get_queryset(self):
         return LinkedinSearchResult.objects.filter(

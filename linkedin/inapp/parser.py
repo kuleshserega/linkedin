@@ -14,11 +14,14 @@ from django.utils.http import urlquote
 
 from models import LinkedinSearch, LinkedinSearchResult, LinkedinUser, \
     STATE_FINISHED, STATE_ERROR, STATE_NOT_LOGGED_IN, STATE_AUTHENTICATED, \
-    STATE_ASKS_CODE, STATE_CODE_NOT_VALID
+    STATE_ASKS_CODE, STATE_CODE_NOT_VALID, STATE_IN_PROCESS, \
+    STATE_LINKEDIN_USER_EMPTY
 
 
 class LinkedinParser(object):
     login_url = 'https://www.linkedin.com/uas/login?goback=&trk=hb_signin'
+
+    user = None
 
     LOGIN_BUTTON_XPATH = '//input[@type="submit"]'
 
@@ -34,7 +37,7 @@ class LinkedinParser(object):
     def __init__(self, search_term='adidas', *args, **kwargs):
         super(LinkedinParser, self).__init__(*args, **kwargs)
         self.search_term = search_term
-        self.serch_company_url = self.BASE_URL % self.SEARCH_COMPANY_URL
+        self.search_company_url = self.BASE_URL % self.SEARCH_COMPANY_URL
         self.employees_list_url = self.BASE_URL % self.COMPANY_EMPLOYEES_URL
 
         self.user = self._get_linkedin_user()
@@ -43,7 +46,13 @@ class LinkedinParser(object):
         self.browser.set_window_size(1024, 768)
 
     def _get_linkedin_user(self):
-        qs = LinkedinUser.objects.all()
+        filters = {}
+        if hasattr(self, 'user') and self.user:
+            filters['id'] = self.user.id
+            filters['password'] = self.user.password
+            filters['email'] = self.user.email
+
+        qs = LinkedinUser.objects.filter(**filters)
         if qs:
             return qs[0]
         return None
@@ -66,6 +75,9 @@ class LinkedinParser(object):
         email = self.browser.find_element_by_id("session_key-login")
         password = self.browser.find_element_by_id("session_password-login")
 
+        if not self.user:
+            return STATE_LINKEDIN_USER_EMPTY
+
         email.send_keys(self.user.email)
         password.send_keys(self.user.password)
 
@@ -75,18 +87,25 @@ class LinkedinParser(object):
 
         is_authenticated = self._is_user_auth()
         if not is_authenticated:
-            asks_verification = self._asks_code_verification()
-            if asks_verification:
-                self.linkedin_search.status = STATE_ASKS_CODE
-                self.linkedin_search.save()
-
-                verified = self._substitute_verification_code()
-                if not verified:
-                    return STATE_CODE_NOT_VALID
-            else:
-                return STATE_NOT_LOGGED_IN
+            search_status = self._get_search_status()
+            if search_status:
+                return search_status
 
         return STATE_AUTHENTICATED
+
+    def _get_search_status(self):
+        asks_verification = self._asks_code_verification()
+        if asks_verification:
+            self.linkedin_search.status = STATE_ASKS_CODE
+            self.linkedin_search.save()
+
+            verified = self._substitute_verification_code()
+            if not verified:
+                return STATE_CODE_NOT_VALID
+        else:
+            return STATE_NOT_LOGGED_IN
+
+        return None
 
     def _make_search(self):
         # set company id depending what user entered in the search
@@ -96,17 +115,16 @@ class LinkedinParser(object):
             company_id = self.search_term
         else:
             self.browser.get(
-                self.serch_company_url % urlquote(self.search_term))
+                self.search_company_url % urlquote(self.search_term))
             company_id = self._get_company_id()
 
         self.linkedin_search.companyId = company_id
-        self.linkedin_search.search_company=self.search_term
+        self.linkedin_search.search_company = self.search_term
+        self.linkedin_search.status = STATE_IN_PROCESS
 
         if not company_id:
             self.linkedin_search.status = STATE_ERROR
-            self.linkedin_search.save()
-        else:
-            self.linkedin_search.save()
+        self.linkedin_search.save()
 
         self._get_next_list_of_employees(company_id, 1)
 
@@ -117,12 +135,13 @@ class LinkedinParser(object):
             WebDriverWait(
                 self.browser, settings.LINKEDIN_PAGE_TIMEOUT_LAODING).until(
                     element_present)
-            print('User authentificated')
-            with open(str(time.time()), 'w') as f:
-                f.write(self.browser.page_source.encode('utf-8'))
+            print('User authenticated')
+            if settings.DEBUG:
+                file_name = 'auth_%s_%s.html' % (
+                    self.search_term, str(time.time()))
+                file_path = '%s/%s' % (settings.LOGS_DIR, file_name)
+                self._save_page_to_log(file_path)
         except TimeoutException:
-            with open(str(time.time()), 'w') as f:
-                f.write(self.browser.page_source.encode('utf-8'))
             print('Timed out waiting for user login')
             return False
 
@@ -149,7 +168,8 @@ class LinkedinParser(object):
 
         self.user = self._get_linkedin_user()
 
-        verification_code = self.browser.find_element_by_id("verification-code")
+        verification_code = self.browser.find_element_by_id(
+            "verification-code")
         verification_code.send_keys(self.user.verification_code)
 
         code_verification_button = self.browser.find_element_by_xpath(
@@ -178,10 +198,16 @@ class LinkedinParser(object):
             return None
 
         cid = re.search('\d+', company_link_html)
-        return cid.group(0)
+        if cid:
+            cid = cid.group(0)
+        return cid
 
     def _get_next_list_of_employees(self, company_id, page):
         self._wait_for_page_is_loaded(company_id, page)
+        if settings.DEBUG:
+            file_name = '%s_%s.html' % (self.search_term, str(time.time()))
+            file_path = '%s/%s' % (settings.LOGS_DIR, file_name)
+            self._save_page_to_log(file_path)
 
         page_html = html.fromstring(self.browser.page_source)
 
@@ -203,9 +229,8 @@ class LinkedinParser(object):
         if employees_list:
             self._get_next_list_of_employees(company_id, page+1)
         else:
-            if hasattr(self, 'linkedin_search'):
-                self.linkedin_search.status = STATE_FINISHED
-                self.linkedin_search.save()
+            self.linkedin_search.status = STATE_FINISHED
+            self.linkedin_search.save()
 
     def _get_items(self, employees_list):
         items = []
@@ -255,3 +280,8 @@ class LinkedinParser(object):
                     element_present)
         except TimeoutException:
             print('Timed out waiting for all employees to load')
+
+    def _save_page_to_log(self, file_path):
+        page = self.browser.page_source.encode('utf-8')
+        with open(file_path, 'w') as f:
+            f.write(page)

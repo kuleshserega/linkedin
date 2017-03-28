@@ -13,6 +13,7 @@ STATE_NOT_LOGGED_IN = 4
 STATE_AUTHENTICATED = 5
 STATE_ASKS_CODE = 6
 STATE_CODE_NOT_VALID = 7
+STATE_LINKEDIN_USER_EMPTY = 8
 
 
 STATUS_CHOICES = (
@@ -23,6 +24,7 @@ STATUS_CHOICES = (
     (STATE_AUTHENTICATED, _('Linkedin user has been authenticated')),
     (STATE_ASKS_CODE, _('Linkedin asks verification code')),
     (STATE_CODE_NOT_VALID, _('Linkedin verification code is not valid')),
+    (STATE_LINKEDIN_USER_EMPTY, _('No linkedin user was added to the db')),
 )
 
 
@@ -68,5 +70,8 @@ class LinkedinUser(models.Model):
     password = models.CharField(
         max_length=120, verbose_name=_('Linkedin password'))
     verification_code = models.CharField(
-        default=None, null=True, max_length=30,
+        default=None, null=True, blank=True, max_length=30,
         verbose_name=_('Linkedin verification code'))
+
+    def __str__(self):
+        return self.email

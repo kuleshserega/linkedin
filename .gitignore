@@ -1,4 +1,5 @@
 .env/
 linkedin/logs/
 linkedin/ghostdriver.log
+linkedin/linkedin/settings_local.py
 *.pyc

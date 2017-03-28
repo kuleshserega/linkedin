@@ -23,6 +23,8 @@ LINKEDIN_PAGE_TIMEOUT_LAODING = 60
 
 ROWS_ON_PAGE = 10
 
+MAX_REPEAT_LINKEDIN_REQUEST = 3
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.10/howto/deployment/checklist/
 

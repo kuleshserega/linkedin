@@ -15,7 +15,7 @@ from django.utils.http import urlquote
 from models import LinkedinSearch, LinkedinSearchResult, LinkedinUser, \
     STATE_FINISHED, STATE_ERROR, STATE_NOT_LOGGED_IN, STATE_AUTHENTICATED, \
     STATE_ASKS_CODE, STATE_CODE_NOT_VALID, STATE_IN_PROCESS, \
-    STATE_LINKEDIN_USER_EMPTY
+    STATE_LINKEDIN_USER_EMPTY, STATE_ASKS_PREMIUM
 
 
 class LinkedinParser(object):
@@ -177,8 +177,6 @@ class LinkedinParser(object):
         if re.match(r'\d+$', self.search_term.encode('utf-8')):
             company_id = self.search_term
         else:
-            self.browser.get(
-                self.search_company_url % urlquote(self.search_term))
             company_id = self._get_company_id()
             repeat_request_count = 0
             while (not company_id and repeat_request_count <
@@ -196,21 +194,12 @@ class LinkedinParser(object):
             self.linkedin_search.status = STATE_ERROR
         self.linkedin_search.save()
 
-        repeat_request_page_count = 0
-        is_loaded = self._get_next_list_of_employees(company_id, 1)
-        while (not is_loaded and repeat_request_page_count <
-               settings.MAX_REPEAT_LINKEDIN_REQUEST):
-            is_loaded = self._get_next_list_of_employees(company_id, 1)
-            repeat_request_page_count += 1
-            print('Current retry to load 1 page: %s'
-                  % repeat_request_page_count)
-
-        if not is_loaded:
-            self.linkedin_search.status = STATE_ERROR
-            self.linkedin_search.save()
-            return False
+        self._get_next_list_of_employees(company_id, 1)
 
     def _get_company_id(self):
+        self.browser.get(
+            self.search_company_url % urlquote(self.search_term))
+
         timeout_exception_msg = 'Timed out waiting for companies page to load'
         elem_exists = self._selenium_element_load_waiting(
             By.CLASS_NAME, 'search-result__title',
@@ -220,6 +209,11 @@ class LinkedinParser(object):
         if not elem_exists:
             return None
 
+        result = self._check_company_id()
+
+        return result
+
+    def _check_company_id(self):
         search_page_html = html.fromstring(self.browser.page_source)
 
         xp = '(//a[contains(@class, "search-result__result-link")]/@href)[1]'
@@ -238,59 +232,62 @@ class LinkedinParser(object):
         return None
 
     def _get_next_list_of_employees(self, company_id, page_numb):
-        employees_loaded = self._wait_for_page_is_loaded(company_id, page_numb)
-        if not employees_loaded:
-            return False
-
-        if settings.DEBUG:
-            file_name = '%s_%s.html' % (self.search_term, str(time.time()))
-            self._save_page_to_log(file_name)
-
+        self._load_employees_page(company_id, page_numb)
         page_html = html.fromstring(self.browser.page_source)
 
         xp = '//li[contains(@class, "search-result__occluded-item")]'
         employees_list = page_html.xpath(xp)
 
-        items = self._get_items(employees_list, page_numb)
+        premium_exists = self._check_premium_exists(employees_list)
+        if premium_exists and len(employees_list) == 1:
+            self.linkedin_search.status = STATE_ASKS_PREMIUM
+            self.linkedin_search.save()
+            return False
+
+        items = self._get_items(employees_list, page_numb, premium_exists)
         if not isinstance(items, list):
+            self.linkedin_search.status = STATE_FINISHED
+            self.linkedin_search.save()
             return False
 
         self._save_items_to_db(items)
 
         if employees_list:
-            repeat_request_count = 0
-            is_loaded = self._get_next_list_of_employees(
-                company_id, page_numb+1)
-            if is_loaded:
-                return True
-
-            while (not is_loaded and repeat_request_count <
-                   settings.MAX_REPEAT_LINKEDIN_REQUEST):
-                is_loaded = self._get_next_list_of_employees(
-                    company_id, page_numb+1)
-                repeat_request_count += 1
-                print('Current retry to load %d page: %s'
-                      % (page_numb+1, repeat_request_count))
-
-            if not is_loaded:
-                self.linkedin_search.status = STATE_ERROR
-                self.linkedin_search.save()
-                return False
-            return True
+            self._get_next_list_of_employees(company_id, page_numb+1)
         else:
             self.linkedin_search.status = STATE_FINISHED
             self.linkedin_search.save()
 
-    def _get_items(self, employees_list, npage):
+    def _check_premium_exists(self, employees_list):
+        if employees_list:
+            premium_exists = employees_list[0].xpath(
+                './/div[contains(@class, "search-paywall__warning")]')
+            if premium_exists:
+                return True
+
+        return False
+
+    def _load_employees_page(self, company_id, page_numb):
+        employees_loaded = self._wait_for_page_is_loaded(company_id, page_numb)
+        repeat_request_count = 0
+        while (not employees_loaded and repeat_request_count <
+               settings.MAX_REPEAT_LINKEDIN_REQUEST):
+            employees_loaded = self._wait_for_page_is_loaded(
+                company_id, page_numb)
+            repeat_request_count += 1
+            print('Current retry to load page number %d: %s'
+                  % (page_numb, repeat_request_count))
+
+        if settings.DEBUG:
+            file_name = '%s_%s.html' % (self.search_term, str(time.time()))
+            self._save_page_to_log(file_name)
+
+    def _get_items(self, employees_list, npage, premium_exists=False):
         items = []
-        for employee in employees_list:
+        for i, employee in enumerate(employees_list):
             try:
-                try_premium_exists = employee.xpath(
-                    './/div[contains(@class, "search-paywall__warning")]')
-                if try_premium_exists:
-                    self.linkedin_search.status = STATE_ERROR
-                    self.linkedin_search.save()
-                    return None
+                if premium_exists and i == 0:
+                    continue
 
                 full_name = employee.xpath(
                     './/span[contains(@class, "actor-name")]/text()')[0]
@@ -326,6 +323,12 @@ class LinkedinParser(object):
         if not elem_exists:
             return False
 
+        is_loaded = self._wait_second_part_is_loaded(page)
+        if not is_loaded:
+            return False
+        return True
+
+    def _wait_second_part_is_loaded(self, page):
         self.browser.execute_script(
             "window.scrollTo(0, document.body.scrollHeight);")
 

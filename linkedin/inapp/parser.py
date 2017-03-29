@@ -347,6 +347,8 @@ class LinkedinParser(object):
                 '//h1[contains(@class, "search-no-results__message")]')
         except NoSuchElementException:
             return False
+        except Exception as e:
+            print('Error:', e)
 
         return True
 

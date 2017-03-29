@@ -46,6 +46,10 @@ class LinkedinParser(object):
         self.browser.set_window_size(1024, 768)
 
     def _get_linkedin_user(self):
+        """
+        Returns:
+            User object from db, None if user not found
+        """
         filters = {}
         if hasattr(self, 'user') and self.user:
             filters['id'] = self.user.id
@@ -60,6 +64,9 @@ class LinkedinParser(object):
     def _selenium_element_load_waiting(
             self, by_selector_type, selector,
             success_msg='', timeout_exception_msg=''):
+        """Wrapper around explicity wait for
+        elememt will appear in selenium browser
+        """
         try:
             element_present = EC.presence_of_element_located(
                 (by_selector_type, selector))
@@ -77,7 +84,8 @@ class LinkedinParser(object):
         return True
 
     def parse(self):
-        # use selenium to authenticate and load linkedin page
+        """Use selenium to authenticate and load linkedin page
+        """
         self.browser.get(self.login_url)
         self.linkedin_search = LinkedinSearch(search_company=self.search_term)
 
@@ -91,6 +99,11 @@ class LinkedinParser(object):
         self.browser.quit()
 
     def _make_login(self):
+        """Try to authenticate with selenium browser
+
+        Returns:
+            Status of authentication
+        """
         email = self.browser.find_element_by_id("session_key-login")
         password = self.browser.find_element_by_id("session_password-login")
 
@@ -113,21 +126,29 @@ class LinkedinParser(object):
         return STATE_AUTHENTICATED
 
     def _is_user_auth(self):
+        """Check substituted in selenium user is authenticated on linkedin
+
+        Returns:
+            True if is authenticated, False if not
+        """
         elem_exists = self._selenium_element_load_waiting(
             By.ID, 'nav-settings__dropdown-trigger',
             success_msg='User authenticated',
             timeout_exception_msg='Timed out waiting for user login')
 
-        if settings.DEBUG:
-            file_name = 'auth_%s_%s.html' % (
-                self.search_term, str(time.time()))
-            self._save_page_to_log(file_name)
+        file_name = 'auth_%s_%s.html' % (self.search_term, str(time.time()))
+        self._save_page_to_log_if_debug(file_name)
 
         if not elem_exists:
             return False
         return True
 
     def _get_search_status(self):
+        """Check status of the running search
+
+        Returns:
+            None if any condition is not satisfied, Status code otherwise
+        """
         asks_verification = self._asks_code_verification()
         if asks_verification:
             self.linkedin_search.status = STATE_ASKS_CODE
@@ -142,6 +163,11 @@ class LinkedinParser(object):
         return None
 
     def _asks_code_verification(self):
+        """For case when linkedin has been asked for code verification
+
+        Returns:
+            True if code verification exist on the page, False if not
+        """
         timeout_exception_msg = 'Timed out waiting for' \
             'linkedin verification page'
         elem_exists = self._selenium_element_load_waiting(
@@ -154,7 +180,12 @@ class LinkedinParser(object):
         return True
 
     def _substitute_verification_code(self):
-        print('Begin waiting for user set verification code')
+        """Try to substitute and send verification code in selenium browser
+
+        Returns:
+            Check function: _is_user_auth
+        """
+        print('Start waiting for user set verification code')
         time.sleep(180)
         print('End waiting')
 
@@ -171,9 +202,9 @@ class LinkedinParser(object):
         return self._is_user_auth()
 
     def _make_search(self):
-        # set company id depending what user entered in the search
-        # if only numbers then set value as company id
-        # if not then set search_term as company name
+        """Make search with search term
+        If search term has only numbers then set value as company id
+        otherwise set search_term as company name"""
         if re.match(r'\d+$', self.search_term.encode('utf-8')):
             company_id = self.search_term
         else:
@@ -197,6 +228,11 @@ class LinkedinParser(object):
         self._get_next_list_of_employees(company_id, 1)
 
     def _get_company_id(self):
+        """Wait for search page loading
+
+        Returns:
+            Function _check_company_id result
+        """
         self.browser.get(
             self.search_company_url % urlquote(self.search_term))
 
@@ -214,6 +250,11 @@ class LinkedinParser(object):
         return result
 
     def _check_company_id(self):
+        """Try to find company id on search page in selenium browser
+
+        Returns:
+            Company Id if exists, None if company id not found
+        """
         search_page_html = html.fromstring(self.browser.page_source)
 
         xp = '(//a[contains(@class, "search-result__result-link")]/@href)[1]'
@@ -232,6 +273,9 @@ class LinkedinParser(object):
         return None
 
     def _get_next_list_of_employees(self, company_id, page_numb):
+        """Recursive function that call oneself if new items exists on page
+        Stop if linkedin asks premium account or no items returns
+        """
         self._load_employees_page(company_id, page_numb)
         page_html = html.fromstring(self.browser.page_source)
 
@@ -242,13 +286,13 @@ class LinkedinParser(object):
         if premium_exists and len(employees_list) == 1:
             self.linkedin_search.status = STATE_ASKS_PREMIUM
             self.linkedin_search.save()
-            return False
+            return None
 
         items = self._get_items(employees_list, page_numb, premium_exists)
         if not isinstance(items, list):
             self.linkedin_search.status = STATE_FINISHED
             self.linkedin_search.save()
-            return False
+            return None
 
         self._save_items_to_db(items)
 
@@ -259,6 +303,11 @@ class LinkedinParser(object):
             self.linkedin_search.save()
 
     def _check_premium_exists(self, employees_list):
+        """Check if linkedin asks for premium
+
+        Returns:
+            True if premium block exists, False otherwise
+        """
         if employees_list:
             premium_exists = employees_list[0].xpath(
                 './/div[contains(@class, "search-paywall__warning")]')
@@ -268,6 +317,7 @@ class LinkedinParser(object):
         return False
 
     def _load_employees_page(self, company_id, page_numb):
+        # Try to load employees page MAX_REPEAT_LINKEDIN_REQUEST times
         employees_loaded = self._wait_for_page_is_loaded(company_id, page_numb)
         repeat_request_count = 0
         while (not employees_loaded and repeat_request_count <
@@ -278,11 +328,15 @@ class LinkedinParser(object):
             print('Current retry to load page number %d: %s'
                   % (page_numb, repeat_request_count))
 
-        if settings.DEBUG:
             file_name = '%s_%s.html' % (self.search_term, str(time.time()))
-            self._save_page_to_log(file_name)
+            self._save_page_to_log_if_debug(file_name)
 
     def _get_items(self, employees_list, npage, premium_exists=False):
+        """Get all items(linkedin users) from loaded employees page
+
+        Returns:
+            Items list, None if has errors in parse data with xpath
+        """
         items = []
         for i, employee in enumerate(employees_list):
             try:
@@ -302,6 +356,7 @@ class LinkedinParser(object):
         return items
 
     def _save_items_to_db(self, items):
+        # Save items (linkedin users) to db
         empls = []
         for item in items:
             empls.append(LinkedinSearchResult(
@@ -311,6 +366,12 @@ class LinkedinParser(object):
         LinkedinSearchResult.objects.bulk_create(empls)
 
     def _wait_for_page_is_loaded(self, company_id, page):
+        """Waiting for employees page loaded in selenium browser
+
+        Returns:
+            True if all page has been loaded,
+            False if one of the page parts was not loaded
+        """
         self.browser.get(self.employees_list_url % (company_id, page))
         success_msg = 'First part of employees %d page is loaded' % page
         timeout_exception_msg = 'Timed out waiting for company' \
@@ -329,6 +390,11 @@ class LinkedinParser(object):
         return True
 
     def _wait_second_part_is_loaded(self, page):
+        """Waiting for second part of employees page loaded
+
+        Returns:
+            True part has been loaded, False otherwise
+        """
         self.browser.execute_script(
             "window.scrollTo(0, document.body.scrollHeight);")
 
@@ -348,8 +414,10 @@ class LinkedinParser(object):
 
         return True
 
-    def _save_page_to_log(self, file_name):
-        file_path = '%s/%s' % (settings.LOGS_DIR, file_name)
-        page = self.browser.page_source.encode('utf-8')
-        with open(file_path, 'w') as f:
-            f.write(page)
+    def _save_page_to_log_if_debug(self, file_name):
+        # Write html pages to project logs dir if DEBUG setting is True
+        if settings.DEBUG:
+            file_path = '%s/%s' % (settings.LOGS_DIR, file_name)
+            page = self.browser.page_source.encode('utf-8')
+            with open(file_path, 'w') as f:
+                f.write(page)

@@ -1,0 +1,20 @@
+[program:linkedin]
+command=/home/ubuntu/public_html/linkedin/.env/bin/gunicorn linkedin.wsgi:application -b 127.0.0.1:9000
+directory=/home/ubuntu/public_html/linkedin/linkedin/
+user=ubuntu
+group=ubuntu
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/linkedin.log
+stdout_logfile_maxbytes=1MB
+stdout_logfile_backups=2
+
+[program:celery_linkedin]
+command=/home/ubuntu/public_html/linkedin/.env/bin/celery --app=linkedin.celery:app worker --loglevel=info
+directory=/home/ubuntu/public_html/linkedin/linkedin/
+user=ubuntu
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/celery.log
+stdout_logfile_maxbytes=1MB
+stdout_logfile_backups=2

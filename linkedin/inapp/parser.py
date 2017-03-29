@@ -297,11 +297,6 @@ class LinkedinParser(object):
             return None
 
         items = self._get_items(employees_list, page_numb, premium_exists)
-        if not isinstance(items, list):
-            self.linkedin_search.status = STATE_FINISHED
-            self.linkedin_search.save()
-            return None
-
         self._save_items_to_db(items)
 
         if employees_list:
@@ -342,6 +337,19 @@ class LinkedinParser(object):
         file_name = '%s_%s.html' % (self.search_term, str(time.time()))
         self._save_page_to_log_if_debug(file_name)
 
+    def _no_page_results(self):
+        """
+        Returns:
+            True if no results linkedin message found, False otherwise
+        """
+        try:
+            self.browser.find_element_by_xpath(
+                '//h1[contains(@class, "search-no-results__message")]')
+        except NoSuchElementException:
+            return False
+
+        return True
+
     def _get_items(self, employees_list, npage, premium_exists=False):
         """Get all items(linkedin users) from loaded employees page
 
@@ -360,8 +368,7 @@ class LinkedinParser(object):
                     './/p[contains(@class, "subline-level-1")]/text()')[0]
                 items.append({'full_name': full_name, 'title': title})
             except Exception:
-                print('Full name or title is not found')
-                return None
+                print('Full name or title is not found in entry')
 
         print('Add %d items from page number %d' % (len(items), npage))
         return items
@@ -386,10 +393,13 @@ class LinkedinParser(object):
         self.browser.get(self.employees_list_url % (self.company_id, page))
 
         success_msg = 'First part of employees %d page is loaded' % page
-        timeout_exception_msg = 'Timed out waiting for company' \
-            'employees page to load'
+        timeout_exception_msg = 'Timed out waiting for ' \
+            'employees page number %d to load' % page
+        last_el_entry = '//li[contains' \
+            '(@class, "search-result__occluded-item")]' \
+            '[7]/div[contains(@class, "search-result")]'
         elem_exists = self._selenium_element_load_waiting(
-            By.CLASS_NAME, 'msg-overlay-bubble-header__title',
+            By.XPATH, last_el_entry,
             success_msg=success_msg,
             timeout_exception_msg=timeout_exception_msg)
 
@@ -399,19 +409,6 @@ class LinkedinParser(object):
         is_loaded = self._wait_second_part_is_loaded(page)
         if not is_loaded:
             return False
-        return True
-
-    def _no_page_results(self):
-        """
-        Returns:
-            True if no results linkedin message found, False otherwise
-        """
-        try:
-            self.browser.find_element_by_xpath(
-                '//h1[contains(@class, "search-no-results__message")]')
-        except NoSuchElementException:
-            return False
-
         return True
 
     def _wait_second_part_is_loaded(self, page):

@@ -2,6 +2,7 @@
 import re
 from lxml import html
 import time
+import signal
 import logging
 
 from selenium import webdriver
@@ -89,7 +90,10 @@ class LinkedinParser(object):
     def parse(self):
         """Use selenium to authenticate and load linkedin page
         """
-        self.browser.get(self.login_url)
+        try:
+            self.browser.get(self.login_url)
+        except Exception as e:
+            logger.error(e)
         self.linkedin_search = LinkedinSearch(search_company=self.search_term)
 
         login_status = self._make_login()
@@ -100,6 +104,7 @@ class LinkedinParser(object):
             self._make_search()
 
         try:
+            self.browser.service.process.send_signal(signal.SIGTERM)
             self.browser.quit()
         except OSError as e:
             logger.error(e)
@@ -110,18 +115,22 @@ class LinkedinParser(object):
         Returns:
             Status of authentication
         """
-        email = self.browser.find_element_by_id("session_key-login")
-        password = self.browser.find_element_by_id("session_password-login")
+        try:
+            email = self.browser.find_element_by_id("session_key-login")
+            password = self.browser.find_element_by_id(
+                "session_password-login")
 
-        if not self.user:
-            return STATE_LINKEDIN_USER_EMPTY
+            if not self.user:
+                return STATE_LINKEDIN_USER_EMPTY
 
-        email.send_keys(self.user.email)
-        password.send_keys(self.user.password)
+            email.send_keys(self.user.email)
+            password.send_keys(self.user.password)
 
-        button_login = self.browser.find_element_by_xpath(
-            self.LOGIN_BUTTON_XPATH)
-        button_login.click()
+            button_login = self.browser.find_element_by_xpath(
+                self.LOGIN_BUTTON_XPATH)
+            button_login.click()
+        except Exception as e:
+            logger.error(e)
 
         is_authenticated = self._is_user_auth()
         if not is_authenticated:
@@ -196,13 +205,16 @@ class LinkedinParser(object):
         logger.info('End waiting')
 
         self.user = self._get_linkedin_user()
-        verification_code = self.browser.find_element_by_id(
-            "verification-code")
-        verification_code.send_keys(self.user.verification_code)
+        try:
+            verification_code = self.browser.find_element_by_id(
+                "verification-code")
+            verification_code.send_keys(self.user.verification_code)
 
-        code_verification_button = self.browser.find_element_by_xpath(
-            self.VERIFICATION_BUTTON_XPATH)
-        code_verification_button.click()
+            code_verification_button = self.browser.find_element_by_xpath(
+                self.VERIFICATION_BUTTON_XPATH)
+            code_verification_button.click()
+        except Exception as e:
+            logger.error(e)
 
         return self._is_user_auth()
 
@@ -248,8 +260,11 @@ class LinkedinParser(object):
         Returns:
             Function _check_company_id result
         """
-        self.browser.get(
-            self.search_company_url % urlquote(self.search_term))
+        try:
+            self.browser.get(
+                self.search_company_url % urlquote(self.search_term))
+        except Exception as e:
+            logger.error(e)
 
         timeout_exception_msg = 'Timed out waiting for companies page to load'
         elem_exists = self._selenium_element_load_waiting(
@@ -269,13 +284,19 @@ class LinkedinParser(object):
         Returns:
             Company Id if exists, None if company id not found
         """
-        search_page_html = html.fromstring(self.browser.page_source)
+        try:
+            search_page_html = html.fromstring(self.browser.page_source)
+        except Exception as e:
+            logger.error(e)
 
         xp = '(//a[contains(@class, "search-result__result-link")]/@href)[1]'
         try:
             company_link_html = search_page_html.xpath(xp)[0]
         except IndexError:
             logger.info('Search page has no company link')
+            return None
+        except Exception as e:
+            logger.error(e)
             return None
 
         cid = re.search('\d+', company_link_html)
@@ -291,10 +312,13 @@ class LinkedinParser(object):
         Stop if linkedin asks premium account or no items returns
         """
         self._load_employees_page(page_numb)
-        page_html = html.fromstring(self.browser.page_source)
-
-        xp = '//li[contains(@class, "search-result__occluded-item")]'
-        employees_list = page_html.xpath(xp)
+        try:
+            page_html = html.fromstring(self.browser.page_source)
+            xp = '//li[contains(@class, "search-result__occluded-item")]'
+            employees_list = page_html.xpath(xp)
+        except Exception as e:
+            logger.error(e)
+            return None
 
         premium_exists = self._check_premium_exists(employees_list)
         if premium_exists and len(employees_list) == 1:
@@ -398,7 +422,10 @@ class LinkedinParser(object):
             True if all page has been loaded,
             False if one of the page parts was not loaded or no results found
         """
-        self.browser.get(self.employees_list_url % (self.company_id, page))
+        try:
+            self.browser.get(self.employees_list_url % (self.company_id, page))
+        except Exception as e:
+            logger.error(e)
 
         success_msg = 'First part of employees %d page is loaded' % page
         timeout_exception_msg = 'Timed out waiting for ' \
@@ -425,8 +452,11 @@ class LinkedinParser(object):
         Returns:
             True part has been loaded, False otherwise
         """
-        self.browser.execute_script(
-            "window.scrollTo(0, document.body.scrollHeight);")
+        try:
+            self.browser.execute_script(
+                "window.scrollTo(0, document.body.scrollHeight);")
+        except Exception as e:
+            logger.error(e)
 
         last_el_entry = '//li[contains' \
             '(@class, "search-result__occluded-item")]' \
@@ -448,6 +478,11 @@ class LinkedinParser(object):
         if settings.DEBUG:
             file_path = '%s/%s' % (settings.LOGS_DIR, file_name)
             logger.info('Path to employees list html file: %s' % file_path)
-            page = self.browser.page_source.encode('utf-8')
+            try:
+                page = self.browser.page_source.encode('utf-8')
+            except Exception as e:
+                logger.error(e)
+                return None
+
             with open(file_path, 'w') as f:
                 f.write(page)

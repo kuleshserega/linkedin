@@ -2,6 +2,7 @@
 import re
 from lxml import html
 import time
+import logging
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
@@ -16,6 +17,8 @@ from models import LinkedinSearch, LinkedinSearchResult, LinkedinUser, \
     STATE_FINISHED, STATE_ERROR, STATE_NOT_LOGGED_IN, STATE_AUTHENTICATED, \
     STATE_ASKS_CODE, STATE_CODE_NOT_VALID, STATE_IN_PROCESS, \
     STATE_LINKEDIN_USER_EMPTY, STATE_ASKS_PREMIUM
+
+logger = logging.getLogger('linkedin_parser')
 
 
 class LinkedinParser(object):
@@ -73,12 +76,12 @@ class LinkedinParser(object):
             WebDriverWait(
                 self.browser, settings.LINKEDIN_PAGE_TIMEOUT_LAODING).until(
                     element_present)
-            print(success_msg)
+            logger.info(success_msg)
         except TimeoutException:
-            print(timeout_exception_msg)
+            logger.error(timeout_exception_msg)
             return False
         except Exception as e:
-            print('Error:', e)
+            logger.error(e)
             return False
 
         return True
@@ -185,9 +188,9 @@ class LinkedinParser(object):
         Returns:
             Check function: _is_user_auth
         """
-        print('Start waiting for user set verification code')
+        logger.info('Start waiting for user set verification code')
         time.sleep(180)
-        print('End waiting')
+        logger.info('End waiting')
 
         self.user = self._get_linkedin_user()
         verification_code = self.browser.find_element_by_id(
@@ -231,8 +234,8 @@ class LinkedinParser(object):
                    settings.MAX_REPEAT_LINKEDIN_REQUEST):
                 company_id = self._get_search_company_id()
                 repeat_request_count += 1
-                print('Current retry to find company ID: %s'
-                      % repeat_request_count)
+                logger.info('Current retry to find company ID: %s'
+                            % repeat_request_count)
 
         self.company_id = company_id
 
@@ -269,13 +272,13 @@ class LinkedinParser(object):
         try:
             company_link_html = search_page_html.xpath(xp)[0]
         except IndexError:
-            print('Search page has no company link')
+            logger.info('Search page has no company link')
             return None
 
         cid = re.search('\d+', company_link_html)
         if cid:
             cid = cid.group(0)
-            print('Company ID: %s' % cid)
+            logger.info('Company ID: %s' % cid)
             return cid
 
         return None
@@ -331,8 +334,8 @@ class LinkedinParser(object):
 
             employees_loaded = self._wait_for_page_is_loaded(page_numb)
             repeat_request_count += 1
-            print('Current retry to load page number %d: %s'
-                  % (page_numb, repeat_request_count))
+            logger.info('Current retry to load page number %d: %s'
+                        % (page_numb, repeat_request_count))
 
         file_name = '%s_%s.html' % (self.search_term, str(time.time()))
         self._save_page_to_log_if_debug(file_name)
@@ -348,7 +351,7 @@ class LinkedinParser(object):
         except NoSuchElementException:
             return False
         except Exception as e:
-            print('Error:', e)
+            logger.error(e)
 
         return True
 
@@ -370,9 +373,9 @@ class LinkedinParser(object):
                     './/p[contains(@class, "subline-level-1")]/text()')[0]
                 items.append({'full_name': full_name, 'title': title})
             except Exception:
-                print('Full name or title is not found in entry')
+                logger.error('Full name or title is not found in entry')
 
-        print('Add %d items from page number %d' % (len(items), npage))
+        logger.info('Add %d items from page number %d' % (len(items), npage))
         return items
 
     def _save_items_to_db(self, items):
@@ -441,7 +444,7 @@ class LinkedinParser(object):
         # Write html pages to project logs dir if DEBUG setting is True
         if settings.DEBUG:
             file_path = '%s/%s' % (settings.LOGS_DIR, file_name)
-            print('file_path:', file_path)
+            logger.info('Path to employees list html file: %s' % file_path)
             page = self.browser.page_source.encode('utf-8')
             with open(file_path, 'w') as f:
                 f.write(page)

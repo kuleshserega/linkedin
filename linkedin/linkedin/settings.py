@@ -138,4 +138,35 @@ STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'static'),
 )
 
+LOG_FILE_PATH = os.path.join(LOGS_DIR, 'linkedin_parser.log')
+LOG_FILE_MAX_BYTES = 1024 * 1024 * 10  # 10mb
+LOG_FILE_BACKUP_COUNT = 3
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+        }
+    },
+    'handlers': {
+        'linkedin_parser_handler': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_FILE_PATH,
+            'mode': 'w',
+            'maxBytes': LOG_FILE_MAX_BYTES,
+            'backupCount': LOG_FILE_BACKUP_COUNT,
+            'formatter': 'standard'
+        }
+    },
+    'loggers': {
+        'linkedin_parser': {
+            'handlers': ['linkedin_parser_handler'],
+            'level': 'INFO',
+            'propagate': True
+        }
+    }
+}
+
 from settings_local import *

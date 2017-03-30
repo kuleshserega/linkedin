@@ -99,7 +99,10 @@ class LinkedinParser(object):
         if login_status == STATE_AUTHENTICATED:
             self._make_search()
 
-        self.browser.quit()
+        try:
+            self.browser.quit()
+        except OSError as e:
+            logger.error(e)
 
     def _make_login(self):
         """Try to authenticate with selenium browser

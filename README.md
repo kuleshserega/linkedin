@@ -1,8 +1,14 @@
 # **LinkedIn Scraper** #
 http://34.197.99.99:8000
 
+
+```
+#!python
+
 Login: linkedin
 Pass: _adm1n_*
+
+```
 
 This tool was created for the search the company employees. You can add to the Search field the name of the company or LinkedIn ID. The result of the Search you can see on the Main page or it can be exported to the CSV format.
 http://joxi.ru/brRp41OceoMk21

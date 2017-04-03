@@ -56,6 +56,9 @@ class LinkedinSearch(models.Model):
         }
         return result
 
+    def __str__(self):
+        return self.search_company
+
 
 class LinkedinSearchResult(models.Model):
     first_name = models.CharField(
@@ -68,6 +71,12 @@ class LinkedinSearchResult(models.Model):
         max_length=250, verbose_name=_('Title'))
     search = models.ForeignKey(
         'LinkedinSearch', verbose_name=_('Linkedin Search instance'))
+
+    def __str__(self):
+        last_name = self.last_name
+        if not self.last_name:
+            last_name = ''
+        return "%s %s" % (self.first_name, last_name)
 
 
 class LinkedinUser(models.Model):

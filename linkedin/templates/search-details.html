@@ -12,14 +12,16 @@
         <thead>
           <tr>
             <th>ID</th>
-            <th>Full name</th>
+            <th>First name</th>
+            <th>Last name</th>
             <th>Title</th>
           </tr>
         </thead>
           {% for employee in employees %}
             <tr>
               <td>{{ employee.id }}</td>
-              <td>{{ employee.full_name }}</td>
+              <td>{{ employee.first_name }}</td>
+              <td>{{ employee.last_name }}</td>
               <td>{{ employee.title }}</td>
             </tr>
           {% endfor %}

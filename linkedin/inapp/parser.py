@@ -409,9 +409,18 @@ class LinkedinParser(object):
         # Save items (linkedin users) to db
         empls = []
         for item in items:
+            last_name = None
+            if 'LinkedIn' in item['full_name']:
+                first_name = item['full_name']
+            else:
+                name = item['full_name'].split()
+                first_name = name[0]
+                last_name = name[1]
+
             empls.append(LinkedinSearchResult(
                 search=self.linkedin_search,
-                full_name=item['full_name'],
+                first_name=first_name,
+                last_name=last_name,
                 title=item['title']))
         LinkedinSearchResult.objects.bulk_create(empls)
 

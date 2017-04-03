@@ -58,8 +58,12 @@ class LinkedinSearch(models.Model):
 
 
 class LinkedinSearchResult(models.Model):
-    full_name = models.CharField(
-        max_length=120, verbose_name=_('Full name'))
+    first_name = models.CharField(
+        default=None, null=True, blank=True,
+        max_length=120, verbose_name=_('First name'))
+    last_name = models.CharField(
+        default=None, null=True, blank=True,
+        max_length=120, verbose_name=_('Last name'))
     title = models.CharField(
         max_length=250, verbose_name=_('Title'))
     search = models.ForeignKey(

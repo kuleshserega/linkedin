@@ -96,12 +96,15 @@ def get_linkedin_employees_csv(request, pk):
 
     qs = LinkedinSearchResult.objects.filter(search_id=s.id).order_by('id')
 
-    writer.writerow(['ID SEARCH RESULT', 'FULL NAME', 'TITLE'])
+    writer.writerow(['ID SEARCH RESULT', 'FIRST NAME', 'LAST NAME', 'TITLE'])
     for row in qs:
-        writer.writerow([
-            row.id,
-            row.full_name.encode('utf-8').replace(';', '.'),
-            row.title.encode('utf-8').replace(';', '.')])
+        first_name = row.first_name.encode('utf-8').replace(';', '.') \
+            if row.first_name else None
+        last_name = row.last_name.encode('utf-8').replace(';', '.') \
+            if row.last_name else None
+        title = row.title.encode('utf-8').replace(';', '.') \
+            if row.title else None
+        writer.writerow([row.id, first_name, last_name, title])
 
     return response
 

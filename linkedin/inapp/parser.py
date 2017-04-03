@@ -413,9 +413,9 @@ class LinkedinParser(object):
             if 'LinkedIn' in item['full_name']:
                 first_name = item['full_name']
             else:
-                name = item['full_name'].split()
-                first_name = name[0]
-                last_name = name[1]
+                name = item['full_name'].rsplit(' ', 1)
+                first_name = name[0] if len(name) > 0 else None
+                last_name = name[1] if len(name) > 1 else None
 
             empls.append(LinkedinSearchResult(
                 search=self.linkedin_search,

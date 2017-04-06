@@ -15,6 +15,7 @@
             <th>First name</th>
             <th>Last name</th>
             <th>Title</th>
+            <th>Location</th>
           </tr>
         </thead>
           {% for employee in employees %}
@@ -23,6 +24,7 @@
               <td>{{ employee.first_name }}</td>
               <td>{{ employee.last_name }}</td>
               <td>{{ employee.title }}</td>
+              <td>{{ employee.location }}</td>
             </tr>
           {% endfor %}
       </table>

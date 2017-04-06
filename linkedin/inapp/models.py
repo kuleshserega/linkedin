@@ -69,6 +69,9 @@ class LinkedinSearchResult(models.Model):
         max_length=120, verbose_name=_('Last name'))
     title = models.CharField(
         max_length=250, verbose_name=_('Title'))
+    location = models.CharField(
+        default=None, null=True, blank=True,
+        max_length=250, verbose_name=_('Location'))
     search = models.ForeignKey(
         'LinkedinSearch', verbose_name=_('Linkedin Search instance'))
 

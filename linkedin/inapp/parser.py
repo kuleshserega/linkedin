@@ -398,7 +398,12 @@ class LinkedinParser(object):
                     './/span[contains(@class, "actor-name")]/text()')[0]
                 title = employee.xpath(
                     './/p[contains(@class, "subline-level-1")]/text()')[0]
-                items.append({'full_name': full_name, 'title': title})
+                location = employee.xpath(
+                    './/p[contains(@class, "subline-level-2")]/text()')[0]
+                items.append({
+                    'full_name': full_name,
+                    'title': title,
+                    'location': location})
             except Exception:
                 logger.error('Full name or title is not found in entry')
 
@@ -421,7 +426,8 @@ class LinkedinParser(object):
                 search=self.linkedin_search,
                 first_name=first_name,
                 last_name=last_name,
-                title=item['title']))
+                title=item['title'],
+                location=item['location']))
         LinkedinSearchResult.objects.bulk_create(empls)
 
     def _wait_for_page_is_loaded(self, page):

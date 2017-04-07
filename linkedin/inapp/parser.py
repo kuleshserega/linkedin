@@ -427,7 +427,7 @@ class LinkedinParser(object):
                 first_name=first_name,
                 last_name=last_name,
                 title=item['title'],
-                location=item['location']))
+                location=item['location'].strip()))
         LinkedinSearchResult.objects.bulk_create(empls)
 
     def _wait_for_page_is_loaded(self, page):

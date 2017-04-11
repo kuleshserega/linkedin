@@ -13,7 +13,11 @@
       <h1 class="h1-proj">Search list</h1>
       <form class="search-proj-form" action="{% url 'inapp:runsearch' %}" method="GET">
         <input id="searchbtn" type="submit" class="btn btn-lg btn-primary btn-block search_buttons el-width-110" value="SEARCH" />
-        <input id="id_search" class="form-control search_buttons el-width-300" autocomplete="off" placeholder="Search by company name or company ID" name="search" value="{% if request.GET.search %}{{ request.GET.search }}{% endif %}" type="text" />
+        <select id="search_type" class="selectpicker search_buttons grey777" name="search_type">
+          <option value="1">By company name or company ID</option>
+          <option value="2">By social marketing supervisor</option>
+        </select>
+        <input id="id_search" class="form-control search_buttons el-width-200" autocomplete="off" placeholder="Company name or ID" name="search" value="{% if request.GET.search %}{{ request.GET.search }}{% endif %}" type="text" />
       </form>
     </div>
     {% if results %}
@@ -23,6 +27,7 @@
             <th>ID</th>
             <th>Search company</th>
             <th>Company ID</th>
+            <th>Supervisors by GEO</th>
             <th>Date</th>
             <th>Status</th>
             <th>Link to search details</th>
@@ -32,8 +37,9 @@
         {% for result in results %}
           <tr>
             <td>{{ result.id }}</td>
-            <td>{{ result.search_company }}</td>
+            <td>{% if result.search_company %}{{ result.search_company }}{% endif %}</td>
             <td>{% if result.companyId %}{{ result.companyId }}{% endif %}</td>
+            <td>{% if result.geo %}{{ result.geo }}{% endif %}</td>
             <td>{{ result.date_created|date:'Y-m-d H:i:s' }}</td>
             <td><span title="{{ result.get_status_display }}" class="center glyphicon {{ result.status|status_icons }}"></span></td>
             <td><a title="Search details" target="_blank" class="center" href="{% url 'inapp:search-details' result.id %}"><img width=25 src="{% static 'img/details.png' %}" /></a></td>

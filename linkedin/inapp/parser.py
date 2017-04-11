@@ -21,12 +21,16 @@ from models import LinkedinSearch, LinkedinSearchResult, LinkedinUser, \
 
 logger = logging.getLogger('linkedin_parser')
 
+BY_COMPANY_SEARCH_TYPE = 1
+BY_GEO_FOR_SUPERVISORS_SEARCH_TYPE = 2
+
 
 class LinkedinParser(object):
     login_url = 'https://www.linkedin.com/uas/login?goback=&trk=hb_signin'
 
     user = None
     company_id = None
+    supervisors_url_with_location = None
 
     LOGIN_BUTTON_XPATH = '//input[@type="submit"]'
     VERIFICATION_BUTTON_XPATH = '//input[@type="submit"]'
@@ -37,12 +41,18 @@ class LinkedinParser(object):
         '?keywords=%s&origin=GLOBAL_SEARCH_HEADER'
     COMPANY_EMPLOYEES_URL = 'search/results/people/' \
         '?facetCurrentCompany=%s&page=%d'
+    SOCIAL_SUPERVISORS_URL = 'search/results/people/?keywords=' \
+        'Social%20Marketing%20Supervisor&origin=FACETED_SEARCH'
 
-    def __init__(self, search_term='adidas', *args, **kwargs):
+    def __init__(self, search_term='adidas',
+                 search_type=BY_COMPANY_SEARCH_TYPE, *args, **kwargs):
         super(LinkedinParser, self).__init__(*args, **kwargs)
         self.search_term = search_term
+        self.search_type = int(search_type)
+
         self.search_company_url = self.BASE_URL % self.SEARCH_COMPANY_URL
         self.employees_list_url = self.BASE_URL % self.COMPANY_EMPLOYEES_URL
+        self.base_supervisors_url = self.BASE_URL % self.SOCIAL_SUPERVISORS_URL
 
         self.user = self._get_linkedin_user()
 
@@ -94,11 +104,9 @@ class LinkedinParser(object):
             self.browser.get(self.login_url)
         except Exception as e:
             logger.error(e)
-        self.linkedin_search = LinkedinSearch(search_company=self.search_term)
 
         login_status = self._make_login()
-        self.linkedin_search.status = login_status
-        self.linkedin_search.save()
+        self._create_search_entry(login_status)
 
         if login_status == STATE_AUTHENTICATED:
             self._make_search()
@@ -108,6 +116,16 @@ class LinkedinParser(object):
             self.browser.quit()
         except OSError as e:
             logger.error(e)
+
+    def _create_search_entry(self, login_status):
+        if self.search_type == BY_COMPANY_SEARCH_TYPE:
+            self.linkedin_search = LinkedinSearch(
+                search_company=self.search_term)
+        elif self.search_type == BY_GEO_FOR_SUPERVISORS_SEARCH_TYPE:
+            self.linkedin_search = LinkedinSearch(geo=self.search_term)
+
+        self.linkedin_search.status = login_status
+        self.linkedin_search.save()
 
     def _make_login(self):
         """Try to authenticate with selenium browser
@@ -221,19 +239,27 @@ class LinkedinParser(object):
     def _make_search(self):
         """Make search with search term
         """
+        result_exists = False
+        if self.search_type == BY_COMPANY_SEARCH_TYPE:
+            result_exists = self._search_by_company()
+        elif self.search_type == BY_GEO_FOR_SUPERVISORS_SEARCH_TYPE:
+            result_exists = self._search_by_geo_for_supervisors()
+
+        if result_exists:
+            self._get_next_list_of_employees(1)
+
+    def _search_by_company(self):
         self._set_obj_company_id()
         self.linkedin_search.companyId = self.company_id
-        self.linkedin_search.search_company = self.search_term
         self.linkedin_search.status = STATE_IN_PROCESS
 
         if not self.company_id:
             self.linkedin_search.status = STATE_ERROR
             self.linkedin_search.save()
-            return None
+            return False
 
         self.linkedin_search.save()
-
-        self._get_next_list_of_employees(1)
+        return True
 
     def _set_obj_company_id(self):
         """Set search term value as object company_id if term has only numbers,
@@ -306,6 +332,68 @@ class LinkedinParser(object):
             return cid
 
         return None
+
+    def _search_by_geo_for_supervisors(self):
+        self.supervisors_url_with_location = self._get_url_with_location()
+        self.linkedin_search.status = STATE_IN_PROCESS
+
+        if not self.supervisors_url_with_location:
+            self.linkedin_search.status = STATE_ERROR
+            self.linkedin_search.save()
+            return False
+
+        self.linkedin_search.save()
+        return True
+
+    def _get_url_with_location(self):
+        """Wait for social marketing supervisor page loading
+
+        Returns:
+            Main social marketing supervisor with location
+        """
+        try:
+            self.browser.get(self.base_supervisors_url)
+        except Exception as e:
+            logger.error(e)
+
+        timeout_exception_msg = 'Timed out waiting for social ' \
+            'marketing supervisors page to load'
+        elem_exists = self._selenium_element_load_waiting(
+            By.CLASS_NAME, 'search-facet--geo-region',
+            success_msg='Social marketing supervisors page is loaded',
+            timeout_exception_msg=timeout_exception_msg)
+
+        if elem_exists:
+            elem = self.browser.find_elements_by_class_name(
+                "search-facet--is-expanded")
+            if not elem:
+                result = self._expand_region_block()
+                if not result:
+                    return None
+            self._add_location_into_search_field()
+            self._click_first_from_dropdown()
+        else:
+            return None
+
+    def _expand_region_block(self):
+        """If not expanded region block press to expand
+
+        Returns:
+            True if element from region block exist on page, False otherwise
+        """
+        pass
+
+    def _add_location_into_search_field(self):
+        """Insert location field from search into
+        corresponding region field on linkedin page
+        """
+        pass
+
+    def _click_first_from_dropdown(self):
+        """Insert location field from search into
+        corresponding region field on linkedin page
+        """
+        pass
 
     def _get_next_list_of_employees(self, page_numb):
         """Recursive function that call oneself if new items exists on page
@@ -438,7 +526,11 @@ class LinkedinParser(object):
             False if one of the page parts was not loaded or no results found
         """
         try:
-            self.browser.get(self.employees_list_url % (self.company_id, page))
+            if self.search_type == BY_COMPANY_SEARCH_TYPE:
+                self.browser.get(
+                    self.employees_list_url % (self.company_id, page))
+            elif self.search_type == BY_COMPANY_SEARCH_TYPE:
+                self.browser.get(self.supervisors_url_with_location % page)
         except Exception as e:
             logger.error(e)
 

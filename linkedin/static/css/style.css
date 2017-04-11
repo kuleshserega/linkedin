@@ -226,7 +226,7 @@ i.glyphicon, span.glyphicon {
 }
 
 .search-proj-form {
-    width:500px;
+    width:600px;
     float:right;
     display:block;
 }
@@ -239,8 +239,8 @@ i.glyphicon, span.glyphicon {
     width: 110px!important;
 }
 
-.el-width-300 {
-    width: 300px!important;
+.el-width-200 {
+    width: 200px!important;
 }
 
 #id_username, #id_password {
@@ -249,6 +249,10 @@ i.glyphicon, span.glyphicon {
 
 .clear {
     clear: both;
+}
+
+.grey777{
+    color: #777;
 }
 
 #allProjectsTable th {

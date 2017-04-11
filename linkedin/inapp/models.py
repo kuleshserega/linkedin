@@ -32,13 +32,18 @@ STATUS_CHOICES = (
 
 class LinkedinSearch(models.Model):
     search_company = models.CharField(
+        default=None, null=True, blank=True,
         max_length=120, verbose_name=_('Search term'))
     companyId = models.IntegerField(
-        default=None, null=True, verbose_name=_('Linkedin company ID'))
+        default=None, null=True, blank=True,
+        verbose_name=_('Linkedin company ID'))
     date_created = models.DateTimeField(
         auto_now_add=True, verbose_name=_('Date created'))
     status = models.SmallIntegerField(
         default=1, choices=STATUS_CHOICES, verbose_name=_('Status of search'))
+    geo = models.CharField(
+        default=None, null=True, blank=True,
+        max_length=200, verbose_name=_('Search supervisors by geo'))
 
     def as_dict(self):
         date_created = self.date_created.strftime("%Y-%m-%d %H:%M:%S")
@@ -47,6 +52,7 @@ class LinkedinSearch(models.Model):
             'search_company': self.search_company,
             'date_created': date_created,
             'companyId': self.companyId,
+            'geo': self.geo,
             'status_text': self.get_status_display(),
             'status_icon': status_icons(self.status),
             'search_details_url': reverse(

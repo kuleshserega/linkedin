@@ -16,7 +16,6 @@ STATE_CODE_NOT_VALID = 7
 STATE_LINKEDIN_USER_EMPTY = 8
 STATE_ASKS_PREMIUM = 9
 
-
 STATUS_CHOICES = (
     (STATE_IN_PROCESS, _('Search in process')),
     (STATE_FINISHED, _('Search is finished')),
@@ -27,6 +26,14 @@ STATUS_CHOICES = (
     (STATE_CODE_NOT_VALID, _('Linkedin verification code is not valid')),
     (STATE_LINKEDIN_USER_EMPTY, _('No linkedin user was added to the db')),
     (STATE_ASKS_PREMIUM, _('Linkedin asks premium')),
+)
+
+SEARCH_BY_COMPANY = 1
+SEARCH_BY_GEO = 2
+
+SEARCH_TYPE_CHOICES = (
+    (SEARCH_BY_COMPANY, _('Search by company or company ID')),
+    (SEARCH_BY_GEO, _('Search by Geo for social marketing supervisors'))
 )
 
 
@@ -41,9 +48,8 @@ class LinkedinSearch(models.Model):
         auto_now_add=True, verbose_name=_('Date created'))
     status = models.SmallIntegerField(
         default=1, choices=STATUS_CHOICES, verbose_name=_('Status of search'))
-    geo = models.CharField(
-        default=None, null=True, blank=True,
-        max_length=200, verbose_name=_('Search supervisors by geo'))
+    search_type = models.SmallIntegerField(
+        default=1, choices=STATUS_CHOICES, verbose_name=_('Search type'))
 
     def as_dict(self):
         date_created = self.date_created.strftime("%Y-%m-%d %H:%M:%S")
@@ -52,7 +58,7 @@ class LinkedinSearch(models.Model):
             'search_company': self.search_company,
             'date_created': date_created,
             'companyId': self.companyId,
-            'geo': self.geo,
+            'search_type': self.get_search_type_display(),
             'status_text': self.get_status_display(),
             'status_icon': status_icons(self.status),
             'search_details_url': reverse(

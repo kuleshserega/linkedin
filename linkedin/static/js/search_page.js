@@ -93,12 +93,4 @@ $(document).ready(function(){
 
     $('.messages').html(msg_block);
   }
-
-  $('#search_type').on('change', function(){
-    if ($(this).val() == '1'){
-      $('#id_search').attr('placeholder', 'Company name or ID');
-    } else if ($(this).val() == '2'){
-      $('#id_search').attr('placeholder', 'Location');
-    }
-  });
 });

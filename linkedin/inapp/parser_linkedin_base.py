@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import re
 from lxml import html
 import time
 import signal
@@ -12,57 +11,40 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 
 from django.conf import settings
-from django.utils.http import urlquote
 
 from models import LinkedinSearch, LinkedinSearchResult, LinkedinUser, \
-    STATE_FINISHED, STATE_ERROR, STATE_NOT_LOGGED_IN, STATE_AUTHENTICATED, \
-    STATE_ASKS_CODE, STATE_CODE_NOT_VALID, STATE_IN_PROCESS, \
-    STATE_LINKEDIN_USER_EMPTY, STATE_ASKS_PREMIUM
+    STATE_IN_PROCESS, STATE_FINISHED, STATE_AUTHENTICATED, \
+    STATE_ASKS_CODE, STATE_CODE_NOT_VALID, STATE_LINKEDIN_USER_EMPTY, \
+    STATE_ERROR, STATE_ASKS_PREMIUM, STATE_NOT_LOGGED_IN, SEARCH_BY_COMPANY
 
 logger = logging.getLogger('linkedin_parser')
 
-BY_COMPANY_SEARCH_TYPE = 1
-BY_GEO_FOR_SUPERVISORS_SEARCH_TYPE = 2
 
-
-class LinkedinParser(object):
+class BaseLinkedinParser(object):
     login_url = 'https://www.linkedin.com/uas/login?goback=&trk=hb_signin'
-
+    linkedin_search = None
+    employees_list_url = None
     user = None
-    company_id = None
-    supervisors_url_with_location = None
 
     LOGIN_BUTTON_XPATH = '//input[@type="submit"]'
     VERIFICATION_BUTTON_XPATH = '//input[@type="submit"]'
-    REGION_BLOCK_EXPANDED_XPATH = '//li[contains(@class,' \
-        '"search-facet--geo-region") and ' \
-        'contains(@class, "search-facet--is-expanded")]'
 
     LINKEDIN_URL = 'https://www.linkedin.com/'
     BASE_URL = 'https://www.linkedin.com/%s'
-    SEARCH_COMPANY_URL = 'search/results/companies/' \
-        '?keywords=%s&origin=GLOBAL_SEARCH_HEADER'
-    COMPANY_EMPLOYEES_URL = 'search/results/people/' \
-        '?facetCurrentCompany=%s&page=%d'
-    SOCIAL_SUPERVISORS_URL = 'search/results/index/' \
-        '?keywords=social%20marketing%20supervisor&origin=GLOBAL_SEARCH_HEADER'
-    # 'search/results/people/?keywords=' \
-    # 'Social%20Marketing%20Supervisor&origin=FACETED_SEARCH'
 
     def __init__(self, search_term='adidas',
-                 search_type=BY_COMPANY_SEARCH_TYPE, *args, **kwargs):
-        super(LinkedinParser, self).__init__(*args, **kwargs)
+                 search_type=SEARCH_BY_COMPANY, *args, **kwargs):
+        super(BaseLinkedinParser, self).__init__(*args, **kwargs)
         self.search_term = search_term
-        self.search_type = int(search_type)
-
-        self.search_company_url = self.BASE_URL % self.SEARCH_COMPANY_URL
-        self.employees_list_url = self.BASE_URL % self.COMPANY_EMPLOYEES_URL
-        self.base_supervisors_url = self.BASE_URL % self.SOCIAL_SUPERVISORS_URL
+        self.search_type = search_type
 
         self.user = self._get_linkedin_user()
 
         self.browser = webdriver.PhantomJS()
         self.browser.set_window_size(1024, 768)
+
+    def set_employees_list_url(self):
+        raise NotImplementedError('set_employees_list_url should be override')
 
     def _get_linkedin_user(self):
         """
@@ -114,23 +96,13 @@ class LinkedinParser(object):
         self._create_search_entry(login_status)
 
         if login_status == STATE_AUTHENTICATED:
-            self._make_search()
+            self.make_search()
 
         try:
             self.browser.service.process.send_signal(signal.SIGTERM)
             self.browser.quit()
         except OSError as e:
             logger.error(e)
-
-    def _create_search_entry(self, login_status):
-        if self.search_type == BY_COMPANY_SEARCH_TYPE:
-            self.linkedin_search = LinkedinSearch(
-                search_company=self.search_term)
-        elif self.search_type == BY_GEO_FOR_SUPERVISORS_SEARCH_TYPE:
-            self.linkedin_search = LinkedinSearch(geo=self.search_term)
-
-        self.linkedin_search.status = login_status
-        self.linkedin_search.save()
 
     def _make_login(self):
         """Try to authenticate with selenium browser
@@ -241,241 +213,28 @@ class LinkedinParser(object):
 
         return self._is_user_auth()
 
+    def _create_search_entry(self, login_status):
+        """Create new entry search with transferred search_term and search_type
+        """
+        self.linkedin_search = LinkedinSearch(
+            search_term=self.search_term, search_type=self.search_type)
+
+        self.linkedin_search.status = login_status
+        self.linkedin_search.save()
+
     def _make_search(self):
-        """Make search with search term
+        """Search by company name or company ID
         """
-        result_exists = False
-        if self.search_type == BY_COMPANY_SEARCH_TYPE:
-            result_exists = self._search_by_company()
-        elif self.search_type == BY_GEO_FOR_SUPERVISORS_SEARCH_TYPE:
-            result_exists = self._search_by_geo_for_supervisors()
-
-        if result_exists:
-            self._get_next_list_of_employees(1)
-
-    def _search_by_company(self):
-        self._set_obj_company_id()
-        self.linkedin_search.companyId = self.company_id
+        self.set_employees_list_url()
         self.linkedin_search.status = STATE_IN_PROCESS
-
-        if not self.company_id:
+        if not self.employees_list_url:
             self.linkedin_search.status = STATE_ERROR
             self.linkedin_search.save()
             return False
 
         self.linkedin_search.save()
-        return True
 
-    def _set_obj_company_id(self):
-        """Set search term value as object company_id if term has only numbers,
-        otherwise found company_id on company search page
-        """
-        company_id = None
-        if re.match(r'\d+$', self.search_term.encode('utf-8')):
-            company_id = self.search_term
-        else:
-            company_id = self._get_search_company_id()
-            repeat_request_count = 0
-            while (not company_id and repeat_request_count <
-                   settings.MAX_REPEAT_LINKEDIN_REQUEST):
-                company_id = self._get_search_company_id()
-                repeat_request_count += 1
-                logger.info('Current retry to find company ID: %s'
-                            % repeat_request_count)
-
-        self.company_id = company_id
-
-    def _get_search_company_id(self):
-        """Wait for search page loading
-
-        Returns:
-            Function _check_company_id result
-        """
-        try:
-            self.browser.get(
-                self.search_company_url % urlquote(self.search_term))
-        except Exception as e:
-            logger.error(e)
-
-        timeout_exception_msg = 'Timed out waiting for companies page to load'
-        elem_exists = self._selenium_element_load_waiting(
-            By.CLASS_NAME, 'search-result__title',
-            success_msg='Company page is loaded',
-            timeout_exception_msg=timeout_exception_msg)
-
-        if not elem_exists:
-            return None
-
-        result = self._check_company_id()
-        return result
-
-    def _check_company_id(self):
-        """Try to find company id on search page in selenium browser
-
-        Returns:
-            Company Id if exists, None if company id not found
-        """
-        try:
-            search_page_html = html.fromstring(self.browser.page_source)
-        except Exception as e:
-            logger.error(e)
-
-        xp = '(//a[contains(@class, "search-result__result-link")]/@href)[1]'
-        try:
-            company_link_html = search_page_html.xpath(xp)[0]
-        except IndexError:
-            logger.info('Search page has no company link')
-            return None
-        except Exception as e:
-            logger.error(e)
-            return None
-
-        cid = re.search('\d+', company_link_html)
-        if cid:
-            cid = cid.group(0)
-            logger.info('Company ID: %s' % cid)
-            return cid
-
-        return None
-
-    def _search_by_geo_for_supervisors(self):
-        self._set_url_with_region_for_search()
-        self.linkedin_search.status = STATE_IN_PROCESS
-
-        if not self.supervisors_url_with_location:
-            self.linkedin_search.status = STATE_ERROR
-            self.linkedin_search.save()
-            return False
-
-        self.linkedin_search.save()
-        return True
-
-    def _set_url_with_region_for_search(self):
-        """Load "social marketing supervisor" page with region
-        Set url with region for LinkedIn employees search
-        """
-        base_supervisors_page = self._load_base_supervisors_page()
-        if not base_supervisors_page:
-            return None
-
-        region_block_expanded = self._is_region_block_expanded()
-        if not region_block_expanded:
-            result = self._make_expanded_region_block()
-            if not result:
-                return None
-
-        location_field_added = self._add_location_into_search_field()
-        if not location_field_added:
-            return None
-
-        dropdown_opened = self._click_first_from_dropdown()
-        if not dropdown_opened:
-            return None
-
-        self._set_url_with_geo_location()
-
-    def _load_base_supervisors_page(self):
-        try:
-            self.browser.get(self.base_supervisors_url)
-            print self.browser.current_url
-        except Exception as e:
-            logger.error(e)
-
-        timeout_exception_msg = 'Timed out waiting for social ' \
-            'marketing supervisors page to load'
-        elem_exists = self._selenium_element_load_waiting(
-            By.CLASS_NAME, 'search-facet--geo-region',
-            success_msg='Social marketing supervisors page is loaded',
-            timeout_exception_msg=timeout_exception_msg)
-
-        if not elem_exists:
-            return False
-        return True
-
-    def _is_region_block_expanded(self):
-        region_block_expanded = None
-        try:
-            region_block_expanded = \
-                self.browser.find_element_by_xpath(
-                    self.REGION_BLOCK_EXPANDED_XPATH)
-        except Exception as e:
-            logger.error(e)
-
-        return region_block_expanded
-
-    def _make_expanded_region_block(self):
-        """If not expanded region block press to expand
-
-        Returns:
-            True if element from region block exist on page, False otherwise
-        """
-        region_block_link = self.browser.find_element_by_xpath(
-            '//li[contains(@class, "search-facet--geo-region")]/button')
-        region_block_link.click()
-
-        timeout_exception_msg = 'Timed out waiting for to expand region block'
-        elem_exists = self._selenium_element_load_waiting(
-            By.XPATH, self.REGION_BLOCK_EXPANDED_XPATH,
-            success_msg='Region block is expanded',
-            timeout_exception_msg=timeout_exception_msg)
-
-        if not elem_exists:
-            return False
-        return True
-
-    def _add_location_into_search_field(self):
-        """Insert location field from search into
-        corresponding region field on linkedin page
-        """
-        adding_region_link_xpath = '//li[contains(@class, ' \
-            '"search-facet--geo-region")]/fieldset/ol/' \
-            'li[contains(@class, "search-s-add-facet")]/button'
-        el = self.browser.find_element_by_xpath(adding_region_link_xpath)
-        el.click()
-
-        region_field_xpath = '//li[contains(@class, ' \
-            '"search-facet--geo-region")]/fieldset/ol/' \
-            'li[contains(@class, "search-s-add-facet")]/' \
-            'section/div/div/div/div/div/input'
-        timeout_exception_msg = 'Timed out waiting for adding region field'
-        elem_exists = self._selenium_element_load_waiting(
-            By.XPATH, region_field_xpath,
-            success_msg='Region field is added',
-            timeout_exception_msg=timeout_exception_msg)
-
-        region_field = self.browser.find_element_by_xpath(region_field_xpath)
-        region_field.send_keys(self.linkedin_search.geo)
-
-        # explicity wait for region drop down menu is loaded
-        time.sleep(10)
-
-        if not elem_exists:
-            return False
-        return True
-
-    def _click_first_from_dropdown(self):
-        """Click on first element from drop down region menu
-        Wait for search page with
-        region param in url (facetGeoRegion) will be loaded
-        """
-        first_region_xpath = '//ul[contains(@class, ' \
-            '"type-ahead-results")]/li[1]'
-        try:
-            el = self.browser.find_element_by_xpath(first_region_xpath)
-            el.click()
-        except Exception as e:
-            logger.error(e)
-            return False
-
-        return True
-
-    def _set_url_with_geo_location(self):
-        """Set supervisors_url_with_location property
-        """
-        # TODO: change current behavior to waiting some element on the page
-        time.sleep(10)
-        self.supervisors_url_with_location = self.browser.current_url
-        print self.supervisors_url_with_location
+        self._get_next_list_of_employees(1)
 
     def _get_next_list_of_employees(self, page_numb):
         """Recursive function that call oneself if new items exists on page
@@ -608,11 +367,8 @@ class LinkedinParser(object):
             False if one of the page parts was not loaded or no results found
         """
         try:
-            if self.search_type == BY_COMPANY_SEARCH_TYPE:
-                self.browser.get(
-                    self.employees_list_url % (self.company_id, page))
-            elif self.search_type == BY_COMPANY_SEARCH_TYPE:
-                self.browser.get(self.supervisors_url_with_location % page)
+            self.employees_list_url_with_page = self.employees_list_url % page
+            self.browser.get(self.employees_list_url_with_page)
         except Exception as e:
             logger.error(e)
 

@@ -33,12 +33,12 @@ SEARCH_BY_GEO = 2
 
 SEARCH_TYPE_CHOICES = (
     (SEARCH_BY_COMPANY, _('Search by company or company ID')),
-    (SEARCH_BY_GEO, _('Search by Geo for social marketing supervisors'))
+    (SEARCH_BY_GEO, _('Search by Geo'))
 )
 
 
 class LinkedinSearch(models.Model):
-    search_company = models.CharField(
+    search_term = models.CharField(
         default=None, null=True, blank=True,
         max_length=120, verbose_name=_('Search term'))
     companyId = models.IntegerField(
@@ -49,13 +49,13 @@ class LinkedinSearch(models.Model):
     status = models.SmallIntegerField(
         default=1, choices=STATUS_CHOICES, verbose_name=_('Status of search'))
     search_type = models.SmallIntegerField(
-        default=1, choices=STATUS_CHOICES, verbose_name=_('Search type'))
+        default=1, choices=SEARCH_TYPE_CHOICES, verbose_name=_('Search type'))
 
     def as_dict(self):
         date_created = self.date_created.strftime("%Y-%m-%d %H:%M:%S")
         result = {
             'id': self.id,
-            'search_company': self.search_company,
+            'search_term': self.search_term,
             'date_created': date_created,
             'companyId': self.companyId,
             'search_type': self.get_search_type_display(),

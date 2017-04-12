@@ -102,4 +102,4 @@ class LinkedinParserByCompany(BaseLinkedinParser):
 
     def _compose_employees_list_url(self):
         url = self.base_employees_url % self.linkedin_search.companyId
-        return '&'.join((url, 'page=%d'))
+        return url

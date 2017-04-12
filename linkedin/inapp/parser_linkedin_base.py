@@ -3,6 +3,7 @@ from lxml import html
 import time
 import signal
 import logging
+import urllib
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
@@ -96,7 +97,7 @@ class BaseLinkedinParser(object):
         self._create_search_entry(login_status)
 
         if login_status == STATE_AUTHENTICATED:
-            self.make_search()
+            self._make_search()
 
         try:
             self.browser.service.process.send_signal(signal.SIGTERM)
@@ -366,9 +367,13 @@ class BaseLinkedinParser(object):
             True if all page has been loaded,
             False if one of the page parts was not loaded or no results found
         """
+        if not self.employees_list_url:
+            return False
+
         try:
-            self.employees_list_url_with_page = self.employees_list_url % page
-            self.browser.get(self.employees_list_url_with_page)
+            employees_url_with_page = '&'.join([
+                self.employees_list_url, 'page=%d' % page])
+            self.browser.get(employees_url_with_page)
         except Exception as e:
             logger.error(e)
 

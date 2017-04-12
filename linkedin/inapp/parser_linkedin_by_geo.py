@@ -13,23 +13,19 @@ class LinkedinParserByGeo(BaseLinkedinParser):
     REGION_BLOCK_EXPANDED_XPATH = '//li[contains(@class,' \
         '"search-facet--geo-region") and ' \
         'contains(@class, "search-facet--is-expanded")]'
-    SOCIAL_SUPERVISORS_URL = 'search/results/index/' \
-        '?keywords=social%20marketing%20supervisor&origin=GLOBAL_SEARCH_HEADER'
-    # 'search/results/people/?keywords=' \
-    # 'Social%20Marketing%20Supervisor&origin=FACETED_SEARCH'
-    supervisors_url_with_location = None
+    SOCIAL_SUPERVISORS_URL = 'search/results/people/?keywords=' \
+        'Social%20Marketing%20Supervisor&origin=FACETED_SEARCH'
 
     def __init__(self, *args, **kwargs):
         super(LinkedinParserByGeo, self).__init__(*args, **kwargs)
         self.base_supervisors_url = self.BASE_URL % self.SOCIAL_SUPERVISORS_URL
-        # TODO: redefine employees_list_url
-        # self.employees_list_url = self.BASE_URL % self.COMPANY_EMPLOYEES_URL
 
     def set_employees_list_url(self):
-        self._set_url_with_region_for_search()
-        self.employees_list_url = self._compose_employees_list_url()
+        result = self._set_region_on_search_page()
+        if result:
+            self.employees_list_url = self._compose_employees_list_url()
 
-    def _set_url_with_region_for_search(self):
+    def _set_region_on_search_page(self):
         """Load "social marketing supervisor" page with region
         Set url with region for LinkedIn employees search
         """
@@ -51,12 +47,11 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         if not dropdown_opened:
             return None
 
-        self._set_url_with_geo_location()
+        return True
 
     def _load_base_supervisors_page(self):
         try:
             self.browser.get(self.base_supervisors_url)
-            print self.browser.current_url
         except Exception as e:
             logger.error(e)
 
@@ -123,7 +118,7 @@ class LinkedinParserByGeo(BaseLinkedinParser):
             timeout_exception_msg=timeout_exception_msg)
 
         region_field = self.browser.find_element_by_xpath(region_field_xpath)
-        region_field.send_keys(self.linkedin_search.geo)
+        region_field.send_keys(self.linkedin_search.search_term)
 
         # explicity wait for region drop down menu is loaded
         time.sleep(10)
@@ -148,11 +143,9 @@ class LinkedinParserByGeo(BaseLinkedinParser):
 
         return True
 
-    def _set_url_with_geo_location(self):
-        """Set supervisors_url_with_location property
+    def _compose_employees_list_url(self):
+        """Set employees_list_url property
         """
         # TODO: change current behavior to waiting some element on the page
         time.sleep(10)
-        url = self.browser.current_url
-        print '&'.join((url, 'page=%d'))
-        return '&'.join((url, 'page=%d'))
+        return self.browser.current_url

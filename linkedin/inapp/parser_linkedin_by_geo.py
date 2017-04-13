@@ -94,7 +94,7 @@ class LinkedinParserByGeo(BaseLinkedinParser):
             region_block_link = self.browser.find_element_by_xpath(
                 '//li[contains(@class, "search-facet--geo-region")]/button')
             region_block_link.click()
-            logger.error('Expand region block on search page')
+            logger.info('Expand region block on search page')
         except Exception as e:
             logger.error(e)
             return False
@@ -128,6 +128,7 @@ class LinkedinParserByGeo(BaseLinkedinParser):
                 '"search-facet--geo-region")]/fieldset/ol/' \
                 'li[contains(@class, "search-s-add-facet")]/button'
             el = self.browser.find_element_by_xpath(adding_region_link_xpath)
+            time.sleep(5)
             el.click()
             logger.info('Display region field on the page')
         except Exception as e:

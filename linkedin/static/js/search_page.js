@@ -2,8 +2,9 @@ $(document).ready(function(){
   $('#searchbtn').on('click', function(e){
     e.preventDefault();
     var search_term = $('#id_search').val();
+    var search_type = $('#search_type').val();
     $.ajax({
-      url: '/run-search/?search=' + search_term,
+      url: '/run-search/?search=' + search_term + '&search_type=' + search_type,
       method: 'GET',
       success: function(data){
         show_msg(data);
@@ -51,8 +52,9 @@ $(document).ready(function(){
   var thead_html = '<thead>' +
     '<tr>' +
       '<th>ID</th>' +
-      '<th>Search company</th>' +
+      '<th>Search term</th>' +
       '<th>Company ID</th>' +
+      '<th>Search type</th>' +
       '<th>Date</th>' +
       '<th>Status</th>' +
       '<th>Link to search details</th>' +
@@ -61,15 +63,20 @@ $(document).ready(function(){
   '</thead>';
 
   var get_row_html = function(row){
+    var search_term = '';
+    if(row['search_term']){ search_term = row['search_term']; }
+
     var companyId = '';
-    if(row['companyId']){
-      companyId = row['companyId'];
-    }
+    if(row['companyId']){ companyId = row['companyId']; }
+
+    var geo = '';
+    if(row['search_type']){ search_type = row['search_type']; }
 
     var row_template_html = '<tr>' +
       '<td>' + row['id'] + '</td>' +
-      '<td>' + row['search_company'] + '</td>' +
+      '<td>' + search_term + '</td>' +
       '<td>' + companyId + '</td>' +
+      '<td>' + search_type + '</td>' +
       '<td>' + row['date_created'] + '</td>' +
       '<td><span title="' + row['status_text'] + '" class="center glyphicon ' + row['status_icon'] + '"></span></td>' +
       '<td><a title="Search details" target="_blank" class="center" href="' + row['search_details_url'] + '"><img width=25 src="/static/img/details.png" /></a></td>' +

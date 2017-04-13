@@ -114,10 +114,9 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         corresponding region field on linkedin page
         """
         self._show_region_field()
-        elem_exists = self._insert_val_into_region_field()
-
         # explicity wait for region field is loaded
         time.sleep(10)
+        elem_exists = self._insert_val_into_region_field()
 
         if not elem_exists:
             return False

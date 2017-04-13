@@ -69,7 +69,7 @@ class LinkedinSearch(models.Model):
         return result
 
     def __str__(self):
-        return self.search_company
+        return self.search_term
 
 
 class LinkedinSearchResult(models.Model):

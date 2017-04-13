@@ -425,9 +425,9 @@ class BaseLinkedinParser(object):
 
         return True
 
-    def save_page_to_log_if_debug(self, file_name):
+    def save_page_to_log_if_debug(self, file_name, debug=False):
         # Write html pages to project logs dir if DEBUG setting is True
-        if settings.DEBUG:
+        if settings.DEBUG or debug:
             file_path = '%s/%s' % (settings.LOGS_DIR, file_name)
             logger.info('Path to employees list html file: %s' % file_path)
             try:

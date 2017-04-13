@@ -78,7 +78,8 @@ class SearchDetailsView(LoginRequiredMixin, ListView):
 def make_linkedin_search(request):
     search_term = request.GET.get('search')
     search_type = request.GET.get('search_type')
-    create_linkedin_search.delay(search_term, search_type)
+    search_geo = request.GET.get('search_geo')
+    create_linkedin_search.delay(search_term, search_type, search_geo)
 
     return JsonResponse({'status': 'success', 'msg': 'Linkedin search added'})
 

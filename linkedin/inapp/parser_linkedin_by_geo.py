@@ -16,9 +16,11 @@ class LinkedinParserByGeo(BaseLinkedinParser):
     SOCIAL_SUPERVISORS_URL = 'search/results/people/?keywords=' \
         'Social%20Marketing%20Supervisor&origin=FACETED_SEARCH'
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, search_geo=None, *args, **kwargs):
         super(LinkedinParserByGeo, self).__init__(*args, **kwargs)
         self.base_supervisors_url = self.BASE_URL % self.SOCIAL_SUPERVISORS_URL
+        self.search_geo = search_geo
+        print self.search_term, self.search_type, self.search_geo
 
     def set_employees_list_url(self):
         result = self._set_region_on_search_page()

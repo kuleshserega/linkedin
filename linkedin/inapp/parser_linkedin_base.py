@@ -3,7 +3,6 @@ from lxml import html
 import time
 import signal
 import logging
-import urllib
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
@@ -45,6 +44,9 @@ class BaseLinkedinParser(object):
         self.browser.set_window_size(1024, 768)
 
     def set_employees_list_url(self):
+        """Need to set employees_list_url that will be used
+        with further collection of employees
+        """
         raise NotImplementedError('set_employees_list_url should be override')
 
     def _get_linkedin_user(self):
@@ -148,7 +150,7 @@ class BaseLinkedinParser(object):
             timeout_exception_msg='Timed out waiting for user login')
 
         file_name = 'auth_%s_%s.html' % (self.search_term, str(time.time()))
-        self._save_page_to_log_if_debug(file_name)
+        self.save_page_to_log_if_debug(file_name)
 
         if not elem_exists:
             return False
@@ -295,7 +297,7 @@ class BaseLinkedinParser(object):
                         % (page_numb, repeat_request_count))
 
         file_name = '%s_%s.html' % (self.search_term, str(time.time()))
-        self._save_page_to_log_if_debug(file_name)
+        self.save_page_to_log_if_debug(file_name)
 
     def _no_page_results(self):
         """
@@ -423,7 +425,7 @@ class BaseLinkedinParser(object):
 
         return True
 
-    def _save_page_to_log_if_debug(self, file_name):
+    def save_page_to_log_if_debug(self, file_name):
         # Write html pages to project logs dir if DEBUG setting is True
         if settings.DEBUG:
             file_path = '%s/%s' % (settings.LOGS_DIR, file_name)

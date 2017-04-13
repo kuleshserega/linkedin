@@ -32,20 +32,29 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         base_supervisors_page = self._load_base_supervisors_page()
         if not base_supervisors_page:
             return None
+        # self.save_page_to_log_if_debug('after_load_base_supervisors_page.html')
 
         region_block_expanded = self._is_region_block_expanded()
         if not region_block_expanded:
             result = self._make_expanded_region_block()
             if not result:
                 return None
+        # self.save_page_to_log_if_debug('after_region_block_expanded.html')
 
         location_field_added = self._add_location_into_search_field()
         if not location_field_added:
             return None
 
+        # explicity wait for region drop down menu is loaded
+        time.sleep(30)
+        # self.save_page_to_log_if_debug('after_insert_location.html')
+
         dropdown_opened = self._click_first_from_dropdown()
         if not dropdown_opened:
             return None
+
+        # explicity wait for reload page after region was setted
+        time.sleep(30)
 
         return True
 
@@ -72,6 +81,7 @@ class LinkedinParserByGeo(BaseLinkedinParser):
             region_block_expanded = \
                 self.browser.find_element_by_xpath(
                     self.REGION_BLOCK_EXPANDED_XPATH)
+            logger.info('Region block on search page is expanded')
         except Exception as e:
             logger.error(e)
 
@@ -83,9 +93,14 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         Returns:
             True if element from region block exist on page, False otherwise
         """
-        region_block_link = self.browser.find_element_by_xpath(
-            '//li[contains(@class, "search-facet--geo-region")]/button')
-        region_block_link.click()
+        try:
+            region_block_link = self.browser.find_element_by_xpath(
+                '//li[contains(@class, "search-facet--geo-region")]/button')
+            region_block_link.click()
+            logger.error('Expand region block on search page')
+        except Exception as e:
+            logger.error(e)
+            return False
 
         timeout_exception_msg = 'Timed out waiting for to expand region block'
         elem_exists = self._selenium_element_load_waiting(
@@ -101,12 +116,25 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         """Insert location field from search into
         corresponding region field on linkedin page
         """
-        adding_region_link_xpath = '//li[contains(@class, ' \
-            '"search-facet--geo-region")]/fieldset/ol/' \
-            'li[contains(@class, "search-s-add-facet")]/button'
-        el = self.browser.find_element_by_xpath(adding_region_link_xpath)
-        el.click()
+        self._show_region_field()
+        elem_exists = self._insert_val_into_region_field()
 
+        if not elem_exists:
+            return False
+        return True
+
+    def _show_region_field(self):
+        try:
+            adding_region_link_xpath = '//li[contains(@class, ' \
+                '"search-facet--geo-region")]/fieldset/ol/' \
+                'li[contains(@class, "search-s-add-facet")]/button'
+            el = self.browser.find_element_by_xpath(adding_region_link_xpath)
+            el.click()
+            logger.info('Display region field on the page')
+        except Exception as e:
+            logger.error(e)
+
+    def _insert_val_into_region_field(self):
         region_field_xpath = '//li[contains(@class, ' \
             '"search-facet--geo-region")]/fieldset/ol/' \
             'li[contains(@class, "search-s-add-facet")]/' \
@@ -117,11 +145,14 @@ class LinkedinParserByGeo(BaseLinkedinParser):
             success_msg='Region field is added',
             timeout_exception_msg=timeout_exception_msg)
 
-        region_field = self.browser.find_element_by_xpath(region_field_xpath)
-        region_field.send_keys(self.linkedin_search.search_term)
-
-        # explicity wait for region drop down menu is loaded
-        time.sleep(10)
+        try:
+            region_field = self.browser.find_element_by_xpath(
+                region_field_xpath)
+            region_field.send_keys(self.linkedin_search.search_term)
+            logger.info('Set search term into region field')
+        except Exception as e:
+            logger.error(e)
+            return False
 
         if not elem_exists:
             return False
@@ -137,6 +168,7 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         try:
             el = self.browser.find_element_by_xpath(first_region_xpath)
             el.click()
+            logger.info('Click on the first element from region dropdown')
         except Exception as e:
             logger.error(e)
             return False
@@ -144,8 +176,15 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         return True
 
     def _compose_employees_list_url(self):
-        """Set employees_list_url property
         """
-        # TODO: change current behavior to waiting some element on the page
-        time.sleep(10)
+        Returns:
+            formated employees_list_url without page number
+        """
+        try:
+            logger.info(
+                'Composed employees url %s' % self.browser.current_url)
+        except Exception as e:
+            logger.error(e)
+            return None
+
         return self.browser.current_url

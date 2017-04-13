@@ -32,14 +32,12 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         base_supervisors_page = self._load_base_supervisors_page()
         if not base_supervisors_page:
             return None
-        # self.save_page_to_log_if_debug('after_load_base_supervisors_page.html')
 
         region_block_expanded = self._is_region_block_expanded()
         if not region_block_expanded:
             result = self._make_expanded_region_block()
             if not result:
                 return None
-        # self.save_page_to_log_if_debug('after_region_block_expanded.html')
 
         location_field_added = self._add_location_into_search_field()
         if not location_field_added:
@@ -47,7 +45,6 @@ class LinkedinParserByGeo(BaseLinkedinParser):
 
         # explicity wait for region drop down menu is loaded
         time.sleep(30)
-        # self.save_page_to_log_if_debug('after_insert_location.html')
 
         dropdown_opened = self._click_first_from_dropdown()
         if not dropdown_opened:
@@ -118,6 +115,9 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         """
         self._show_region_field()
         elem_exists = self._insert_val_into_region_field()
+
+        # explicity wait for region field is loaded
+        time.sleep(10)
 
         if not elem_exists:
             return False

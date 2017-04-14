@@ -197,6 +197,6 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         if self.browser.current_url:
             url = self.browser.current_url.replace(
                 '&facetNetwork=["F"]', '').replace(
-                    '&facetNetwork=["F"%2C"S"]', '')
+                    '&facetNetwork=%5B%22F%22%5D', '')
 
         return url

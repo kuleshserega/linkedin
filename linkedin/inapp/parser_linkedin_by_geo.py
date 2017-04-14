@@ -188,15 +188,14 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         """
         url = None
         try:
+            if self.browser.current_url:
+                url = self.browser.current_url.replace(
+                    '&facetNetwork=["F"]', '').replace(
+                        '&facetNetwork=%5B%22F%22%5D', '')
             logger.info(
-                'Composed employees url %s' % self.browser.current_url)
+                'Composed employees url %s' % url)
         except Exception as e:
             logger.error(e)
             return None
-
-        if self.browser.current_url:
-            url = self.browser.current_url.replace(
-                '&facetNetwork=["F"]', '').replace(
-                    '&facetNetwork=%5B%22F%22%5D', '')
 
         return url

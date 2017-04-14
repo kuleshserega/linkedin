@@ -50,6 +50,9 @@ class LinkedinSearch(models.Model):
         default=1, choices=STATUS_CHOICES, verbose_name=_('Status of search'))
     search_type = models.SmallIntegerField(
         default=1, choices=SEARCH_TYPE_CHOICES, verbose_name=_('Search type'))
+    search_geo = models.CharField(
+        default=None, null=True, blank=True,
+        max_length=120, verbose_name=_('Search geo location'))
 
     def as_dict(self):
         date_created = self.date_created.strftime("%Y-%m-%d %H:%M:%S")
@@ -58,6 +61,7 @@ class LinkedinSearch(models.Model):
             'search_term': self.search_term,
             'date_created': date_created,
             'companyId': self.companyId,
+            'search_geo': self.search_geo,
             'search_type': self.get_search_type_display(),
             'status_text': self.get_status_display(),
             'status_icon': status_icons(self.status),

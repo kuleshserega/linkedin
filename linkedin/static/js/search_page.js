@@ -3,12 +3,14 @@ $(document).ready(function(){
     e.preventDefault();
     var search_term = $('#id_search').val();
     var search_type = $('#search_type').val();
+    var string_row_search_geo = (search_type == '2') ? '&search_geo=' + $('#search_geo').val() : '';
     $.ajax({
-      url: '/run-search/?search=' + search_term + '&search_type=' + search_type,
+      url: '/run-search/?search=' + search_term + '&search_type=' + search_type + string_row_search_geo,
       method: 'GET',
       success: function(data){
         show_msg(data);
         $('#id_search').val('');
+        $('#search_geo').val('');
         $('.messages').find('.alert').each(function(){
           var el = $(this);
           setTimeout(function(){
@@ -54,6 +56,7 @@ $(document).ready(function(){
       '<th>ID</th>' +
       '<th>Search term</th>' +
       '<th>Company ID</th>' +
+      '<th>Geo</th>' +
       '<th>Search type</th>' +
       '<th>Date</th>' +
       '<th>Status</th>' +
@@ -69,13 +72,17 @@ $(document).ready(function(){
     var companyId = '';
     if(row['companyId']){ companyId = row['companyId']; }
 
-    var geo = '';
+    var search_geo = '';
+    if(row['search_geo']){ search_geo = row['search_geo']; }
+
+    var search_type = '';
     if(row['search_type']){ search_type = row['search_type']; }
 
     var row_template_html = '<tr>' +
       '<td>' + row['id'] + '</td>' +
       '<td>' + search_term + '</td>' +
       '<td>' + companyId + '</td>' +
+      '<td>' + search_geo + '</td>' +
       '<td>' + search_type + '</td>' +
       '<td>' + row['date_created'] + '</td>' +
       '<td><span title="' + row['status_text'] + '" class="center glyphicon ' + row['status_icon'] + '"></span></td>' +
@@ -93,4 +100,13 @@ $(document).ready(function(){
 
     $('.messages').html(msg_block);
   }
+
+  $('#search_type').on('change', function(){
+    var val = $(this).val();
+    if (val == '1'){
+      $('#search_geo').hide();
+    } else if (val == '2'){
+      $('#search_geo').show();
+    }
+  });
 });

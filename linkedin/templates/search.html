@@ -15,8 +15,9 @@
         <input id="searchbtn" type="submit" class="btn btn-lg btn-primary btn-block search_buttons el-width-110" value="SEARCH" />
         <select id="search_type" class="selectpicker search_buttons grey777" name="search_type">
           <option value="1">By company name or company ID</option>
-          <option value="2">By social marketing supervisors</option>
+          <option value="2">By Geo Location</option>
         </select>
+        <input id="search_geo" style="display: none;" class="form-control search_buttons el-width-110" autocomplete="off" placeholder="Geo location" name="search_geo" type="text" />
         <input id="id_search" class="form-control search_buttons el-width-200" autocomplete="off" placeholder="Search term" name="search" value="{% if request.GET.search %}{{ request.GET.search }}{% endif %}" type="text" />
       </form>
     </div>
@@ -27,6 +28,7 @@
             <th>ID</th>
             <th>Search term</th>
             <th>Company ID</th>
+            <th>Geo</th>
             <th>Search type</th>
             <th>Date</th>
             <th>Status</th>
@@ -39,6 +41,7 @@
             <td>{{ result.id }}</td>
             <td>{% if result.search_term %}{{ result.search_term }}{% endif %}</td>
             <td>{% if result.companyId %}{{ result.companyId }}{% endif %}</td>
+            <td>{% if result.search_geo %}{{ result.search_geo }}{% endif %}</td>
             <td>{% if result.search_type %}{{ result.get_search_type_display }}{% endif %}</td>
             <td>{{ result.date_created|date:'Y-m-d H:i:s' }}</td>
             <td><span title="{{ result.get_status_display }}" class="center glyphicon {{ result.status|status_icons }}"></span></td>

@@ -13,14 +13,21 @@ class LinkedinParserByGeo(BaseLinkedinParser):
     REGION_BLOCK_EXPANDED_XPATH = '//li[contains(@class,' \
         '"search-facet--geo-region") and ' \
         'contains(@class, "search-facet--is-expanded")]'
-    SOCIAL_SUPERVISORS_URL = 'search/results/people/?keywords=' \
-        'Social%20Marketing%20Supervisor&origin=FACETED_SEARCH'
+    SEARCH_BY_KEYWORD_URL = 'search/results/people/?keywords=%s' \
+        '&origin=FACETED_SEARCH'
 
-    def __init__(self, *args, **kwargs):
-        super(LinkedinParserByGeo, self).__init__(*args, **kwargs)
-        self.base_supervisors_url = self.BASE_URL % self.SOCIAL_SUPERVISORS_URL
+    def __init__(self, search_term, search_type,
+                 search_geo=None, *args, **kwargs):
+        super(LinkedinParserByGeo, self).__init__(
+            search_term, search_type, *args, **kwargs)
+        url_part_with_keyword = self.SEARCH_BY_KEYWORD_URL % self.search_term
+        self.base_supervisors_url = self.BASE_URL % url_part_with_keyword
+        self.search_geo = search_geo
 
     def set_employees_list_url(self):
+        self.linkedin_search.search_geo = self.search_geo
+        self.linkedin_search.save()
+
         result = self._set_region_on_search_page()
         if result:
             self.employees_list_url = self._compose_employees_list_url()
@@ -148,7 +155,7 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         try:
             region_field = self.browser.find_element_by_xpath(
                 region_field_xpath)
-            region_field.send_keys(self.linkedin_search.search_term)
+            region_field.send_keys(self.search_geo)
             logger.info('Set search term into region field')
         except Exception as e:
             logger.error(e)

@@ -98,6 +98,9 @@ class LinkedinSearchResult(models.Model):
             last_name = ''
         return "%s %s" % (self.first_name, last_name)
 
+    def __unicode__(self):
+        return unicode(self.id)
+
 
 class LinkedinUser(models.Model):
     email = models.CharField(

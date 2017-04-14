@@ -22,9 +22,9 @@
             <tr>
               <td>{{ employee.id }}</td>
               <td>{{ employee.first_name }}</td>
-              <td>{{ employee.last_name }}</td>
-              <td>{{ employee.title }}</td>
-              <td>{{ employee.location }}</td>
+              <td>{% if employee.last_name %}{{ employee.last_name }}{% endif %}</td>
+              <td>{% if employee.title %}{{ employee.title }}{% endif %}</td>
+              <td>{% if employee.location %}{{ employee.location }}{% endif %}</td>
             </tr>
           {% endfor %}
       </table>

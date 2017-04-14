@@ -82,7 +82,7 @@ $(document).ready(function(){
       '<td>' + row['id'] + '</td>' +
       '<td>' + search_term + '</td>' +
       '<td>' + companyId + '</td>' +
-      '<th>' + search_geo + '</th>' +
+      '<td>' + search_geo + '</td>' +
       '<td>' + search_type + '</td>' +
       '<td>' + row['date_created'] + '</td>' +
       '<td><span title="' + row['status_text'] + '" class="center glyphicon ' + row['status_icon'] + '"></span></td>' +
@@ -100,4 +100,13 @@ $(document).ready(function(){
 
     $('.messages').html(msg_block);
   }
+
+  $('#search_type').on('change', function(){
+    var val = $(this).val();
+    if (val == '1'){
+      $('#search_geo').hide();
+    } else if (val == '2'){
+      $('#search_geo').show();
+    }
+  });
 });

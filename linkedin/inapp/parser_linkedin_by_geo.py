@@ -33,10 +33,10 @@ class LinkedinParserByGeo(BaseLinkedinParser):
             self.employees_list_url = self._compose_employees_list_url()
 
     def _set_region_on_search_page(self):
-        """Load "social marketing supervisor" page with region
+        """Load page with region
         Set url with region for LinkedIn employees search
         """
-        base_supervisors_page = self._load_base_supervisors_page()
+        base_supervisors_page = self._load_base_geo_page()
         if not base_supervisors_page:
             return None
 
@@ -62,17 +62,16 @@ class LinkedinParserByGeo(BaseLinkedinParser):
 
         return True
 
-    def _load_base_supervisors_page(self):
+    def _load_base_geo_page(self):
         try:
             self.browser.get(self.base_supervisors_url)
         except Exception as e:
             logger.error(e)
 
-        timeout_exception_msg = 'Timed out waiting for social ' \
-            'marketing supervisors page to load'
+        timeout_exception_msg = 'Timed out waiting for page with geo is loaded'
         elem_exists = self._selenium_element_load_waiting(
             By.CLASS_NAME, 'search-facet--geo-region',
-            success_msg='Social marketing supervisors page is loaded',
+            success_msg='Page with geo is loaded',
             timeout_exception_msg=timeout_exception_msg)
 
         if not elem_exists:

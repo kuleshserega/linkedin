@@ -322,22 +322,33 @@ class BaseLinkedinParser(object):
         """
         items = []
         for i, employee in enumerate(employees_list):
-            try:
-                if premium_exists and i == 0:
-                    continue
+            if premium_exists and i == 0:
+                continue
 
+            try:
                 full_name = employee.xpath(
                     './/span[contains(@class, "actor-name")]/text()')[0]
+            except Exception:
+                full_name = None
+                logger.error('Full name is not found in entry')
+                continue
+
+            try:
                 title = employee.xpath(
                     './/p[contains(@class, "subline-level-1")]/text()')[0]
+            except Exception:
+                title = None
+
+            try:
                 location = employee.xpath(
                     './/p[contains(@class, "subline-level-2")]/text()')[0]
-                items.append({
-                    'full_name': full_name,
-                    'title': title,
-                    'location': location})
             except Exception:
-                logger.error('Full name or title is not found in entry')
+                location = None
+
+            items.append({
+                'full_name': full_name,
+                'title': title,
+                'location': location})
 
         logger.info('Add %d items from page number %d' % (len(items), npage))
         return items

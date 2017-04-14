@@ -186,6 +186,7 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         Returns:
             formated employees_list_url without page number
         """
+        url = None
         try:
             logger.info(
                 'Composed employees url %s' % self.browser.current_url)
@@ -193,4 +194,9 @@ class LinkedinParserByGeo(BaseLinkedinParser):
             logger.error(e)
             return None
 
-        return self.browser.current_url
+        if self.browser.current_url:
+            url = self.browser.current_url.replace(
+                '&facetNetwork=["F"]', '').replace(
+                    '&facetNetwork=["F"%2C"S"]', '')
+
+        return url

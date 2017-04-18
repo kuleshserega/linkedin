@@ -95,8 +95,9 @@ class BaseLinkedinParser(object):
         except Exception as e:
             logger.error(e)
 
+        self._create_search_entry()
         login_status = self._make_login()
-        self._create_search_entry(login_status)
+        self._update_status(login_status)
 
         if login_status == STATE_AUTHENTICATED:
             self._make_search()
@@ -216,12 +217,14 @@ class BaseLinkedinParser(object):
 
         return self._is_user_auth()
 
-    def _create_search_entry(self, login_status):
+    def _create_search_entry(self):
         """Create new entry search with transferred search_term and search_type
         """
         self.linkedin_search = LinkedinSearch(
             search_term=self.search_term, search_type=self.search_type)
+        self.linkedin_search.save()
 
+    def _update_status(self, login_status):
         self.linkedin_search.status = login_status
         self.linkedin_search.save()
 

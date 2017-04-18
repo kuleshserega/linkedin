@@ -250,6 +250,8 @@ class BaseLinkedinParser(object):
             employees_list = page_html.xpath(xp)
         except Exception as e:
             logger.error(e)
+            self.linkedin_search.status = STATE_FINISHED
+            self.linkedin_search.save()
             return None
 
         premium_exists = self._check_premium_exists(employees_list)
@@ -287,8 +289,8 @@ class BaseLinkedinParser(object):
         repeat_request_count = 0
         while (not employees_loaded and repeat_request_count <
                settings.MAX_REPEAT_LINKEDIN_REQUEST):
-            no_results = self._no_page_results()
-            if no_results:
+            has_no_results_msg = self._page_has_no_results_msg()
+            if has_no_results_msg:
                 break
 
             employees_loaded = self._wait_for_page_is_loaded(page_numb)
@@ -299,7 +301,7 @@ class BaseLinkedinParser(object):
         file_name = '%s_%s.html' % (self.search_term, str(time.time()))
         self.save_page_to_log_if_debug(file_name)
 
-    def _no_page_results(self):
+    def _page_has_no_results_msg(self):
         """
         Returns:
             True if no results linkedin message found, False otherwise
@@ -311,6 +313,7 @@ class BaseLinkedinParser(object):
             return False
         except Exception as e:
             logger.error(e)
+            return False
 
         return True
 

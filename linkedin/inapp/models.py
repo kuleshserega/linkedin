@@ -86,6 +86,9 @@ class LinkedinSearchResult(models.Model):
     title = models.CharField(
         default=None, null=True, blank=True,
         max_length=250, verbose_name=_('Title'))
+    current_company = models.CharField(
+        default=None, null=True, blank=True,
+        max_length=250, verbose_name=_('Current company'))
     location = models.CharField(
         default=None, null=True, blank=True,
         max_length=250, verbose_name=_('Location'))

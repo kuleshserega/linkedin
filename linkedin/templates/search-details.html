@@ -15,6 +15,7 @@
             <th>First name</th>
             <th>Last name</th>
             <th>Title</th>
+            <th>Current position and company</th>
             <th>Location</th>
           </tr>
         </thead>
@@ -24,6 +25,7 @@
               <td>{{ employee.first_name }}</td>
               <td>{% if employee.last_name %}{{ employee.last_name }}{% endif %}</td>
               <td>{% if employee.title %}{{ employee.title }}{% endif %}</td>
+              <td>{% if employee.current_company %}{{ employee.current_company }}{% endif %}</td>
               <td>{% if employee.location %}{{ employee.location }}{% endif %}</td>
             </tr>
           {% endfor %}

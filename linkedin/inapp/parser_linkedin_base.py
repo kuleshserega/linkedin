@@ -351,10 +351,20 @@ class BaseLinkedinParser(object):
             except Exception:
                 location = None
 
+            company_xpath = './/p[contains(@class, ' \
+                '"search-result__snippets")]//text()'
+            try:
+                current_company = employee.xpath(company_xpath)
+                current_company = ' '.join(
+                    current_company).replace('Current:', '')
+            except Exception:
+                current_company = ''
+
             items.append({
                 'full_name': full_name,
                 'title': title,
-                'location': location})
+                'location': location,
+                'current_company': current_company.strip()})
 
         logger.info('Add %d items from page number %d' % (len(items), npage))
         return items
@@ -376,7 +386,8 @@ class BaseLinkedinParser(object):
                 first_name=first_name,
                 last_name=last_name,
                 title=item['title'],
-                location=item['location'].strip()))
+                location=item['location'].strip(),
+                current_company=item['current_company'].strip()))
         LinkedinSearchResult.objects.bulk_create(empls)
 
     def _wait_for_page_is_loaded(self, page):

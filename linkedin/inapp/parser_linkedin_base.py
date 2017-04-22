@@ -249,7 +249,7 @@ class BaseLinkedinParser(object):
         self._load_employees_page(page_numb)
         try:
             page_html = html.fromstring(self.browser.page_source)
-            xp = '//li[contains(@class, "search-result__occluded-item")]'
+            xp = '//li[contains(@class, "search-result--person")]'
             employees_list = page_html.xpath(xp)
         except Exception as e:
             logger.error(e)
@@ -411,7 +411,7 @@ class BaseLinkedinParser(object):
         timeout_exception_msg = 'Timed out waiting for ' \
             'employees page number %d to load' % page
         last_el_entry = '//li[contains' \
-            '(@class, "search-result__occluded-item")]' \
+            '(@class, "search-result--person")]' \
             '[7]/div[contains(@class, "search-result")]'
         elem_exists = self._selenium_element_load_waiting(
             By.XPATH, last_el_entry,
@@ -439,7 +439,7 @@ class BaseLinkedinParser(object):
             logger.error(e)
 
         last_el_entry = '//li[contains' \
-            '(@class, "search-result__occluded-item")]' \
+            '(@class, "search-result--person")]' \
             '[last()]/div[contains(@class, "search-result")]'
 
         s_msg = 'Employees page number %d after scroll is loaded' % page

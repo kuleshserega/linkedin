@@ -312,6 +312,7 @@ class BaseLinkedinParser(object):
         try:
             self.browser.find_element_by_xpath(
                 '//h1[contains(@class, "search-no-results__message")]')
+            logger.info('On current page "has no results" block exists')
         except NoSuchElementException:
             return False
         except Exception as e:

@@ -15,6 +15,8 @@ STATE_ASKS_CODE = 6
 STATE_CODE_NOT_VALID = 7
 STATE_LINKEDIN_USER_EMPTY = 8
 STATE_ASKS_PREMIUM = 9
+STATE_CONNECTION_REFUSED = 10
+
 
 STATUS_CHOICES = (
     (STATE_IN_PROCESS, _('Search in process')),
@@ -26,6 +28,7 @@ STATUS_CHOICES = (
     (STATE_CODE_NOT_VALID, _('Linkedin verification code is not valid')),
     (STATE_LINKEDIN_USER_EMPTY, _('No linkedin user was added to the db')),
     (STATE_ASKS_PREMIUM, _('Linkedin asks premium')),
+    (STATE_CONNECTION_REFUSED, _('Connection refused')),
 )
 
 SEARCH_BY_COMPANY = 1

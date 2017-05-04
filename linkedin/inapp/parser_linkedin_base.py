@@ -15,7 +15,8 @@ from django.conf import settings
 from models import LinkedinSearch, LinkedinSearchResult, LinkedinUser, \
     STATE_IN_PROCESS, STATE_FINISHED, STATE_AUTHENTICATED, \
     STATE_ASKS_CODE, STATE_CODE_NOT_VALID, STATE_LINKEDIN_USER_EMPTY, \
-    STATE_ERROR, STATE_ASKS_PREMIUM, STATE_NOT_LOGGED_IN, SEARCH_BY_COMPANY
+    STATE_ERROR, STATE_ASKS_PREMIUM, STATE_NOT_LOGGED_IN, SEARCH_BY_COMPANY, \
+    STATE_CONNECTION_REFUSED
 
 logger = logging.getLogger('linkedin_parser')
 
@@ -246,7 +247,12 @@ class BaseLinkedinParser(object):
         """Recursive function that call oneself if new items exists on page
         Stop if linkedin asks premium account or no items returns
         """
-        self._load_employees_page(page_numb)
+        state_after_load = self._load_employees_page(page_numb)
+        if state_after_load == STATE_CONNECTION_REFUSED:
+            self.linkedin_search.status = STATE_CONNECTION_REFUSED
+            self.linkedin_search.save()
+            return None
+
         try:
             page_html = html.fromstring(self.browser.page_source)
             xp = '//li[contains(@class, "search-result__occluded-item")]'
@@ -303,6 +309,9 @@ class BaseLinkedinParser(object):
 
         file_name = '%s_%s.html' % (self.search_term, str(time.time()))
         self.save_page_to_log_if_debug(file_name)
+
+        if not employees_loaded:
+            return STATE_CONNECTION_REFUSED
 
     def _page_has_no_results_msg(self):
         """

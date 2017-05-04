@@ -36,6 +36,7 @@ def status_icons(value):
         7: 'glyphicon-remove',
         8: 'glyphicon-minus',
         9: 'glyphicon-king',
+        10: 'glyphicon-resize-full',
     }
 
     return tags[value]

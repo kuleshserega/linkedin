@@ -68,6 +68,7 @@ class LinkedinSearch(models.Model):
             'companyId': self.companyId,
             'search_geo': self.search_geo,
             'search_type': self.get_search_type_display(),
+            'status': self.status,
             'status_text': self.get_status_display(),
             'status_icon': status_icons(self.status),
             'search_details_url': reverse(

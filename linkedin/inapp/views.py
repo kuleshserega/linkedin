@@ -12,6 +12,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.http.response import JsonResponse
 from django.contrib import messages
 from django.conf import settings
+from django.core.management import call_command
 
 from inapp.models import LinkedinSearch, LinkedinSearchResult
 from inapp.tasks import create_linkedin_search
@@ -82,6 +83,13 @@ def make_linkedin_search(request):
     create_linkedin_search.delay(search_term, search_type, search_geo)
 
     return JsonResponse({'status': 'success', 'msg': 'Linkedin search added'})
+
+
+def restart_task(request, task_nmb):
+    call_command('restart_task_with_connection_refused', task_nmb=task_nmb)
+
+    return JsonResponse(
+        {'status': 'success', 'msg': 'Task has been restarted'})
 
 
 def get_linkedin_employees_csv(request, pk):

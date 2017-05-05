@@ -37,6 +37,7 @@ def status_icons(value):
         8: 'glyphicon-minus',
         9: 'glyphicon-king',
         10: 'glyphicon-resize-full',
+        11: 'glyphicon-exclamation-sign',
     }
 
     return tags[value]

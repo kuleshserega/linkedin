@@ -296,6 +296,7 @@ class BaseLinkedinParser(object):
         # Try to load employees page MAX_REPEAT_LINKEDIN_REQUEST times
         employees_loaded = self._wait_for_page_is_loaded(page_numb)
         repeat_request_count = 0
+        has_no_results_msg = False
         while (not employees_loaded and repeat_request_count <
                settings.MAX_REPEAT_LINKEDIN_REQUEST):
             has_no_results_msg = self._page_has_no_results_msg()
@@ -309,6 +310,9 @@ class BaseLinkedinParser(object):
 
         file_name = '%s_%s.html' % (self.search_term, str(time.time()))
         self.save_page_to_log_if_debug(file_name)
+
+        if has_no_results_msg:
+            return None
 
         if not employees_loaded:
             return STATE_CONNECTION_REFUSED

@@ -38,13 +38,16 @@ class BaseLinkedinParser(object):
     LINKEDIN_URL = 'https://www.linkedin.com/'
     BASE_URL = 'https://www.linkedin.com/%s'
 
-    def __init__(self, search_term='adidas',
-                 search_type=SEARCH_BY_COMPANY, *args, **kwargs):
+    def __init__(self, search_term='adidas', search_type=SEARCH_BY_COMPANY,
+                 search_id=None, *args, **kwargs):
         super(BaseLinkedinParser, self).__init__(*args, **kwargs)
         self.search_term = search_term
         self.search_type = search_type
 
         self.user = self._get_linkedin_user()
+
+        self.search_id = search_id
+        self._create_or_update_search_entry()
 
         self.browser = webdriver.PhantomJS()
         self.browser.set_window_size(1024, 768)
@@ -101,11 +104,12 @@ class BaseLinkedinParser(object):
         except Exception as e:
             logger.error(e)
 
-        self._create_search_entry()
-        login_status = self._make_login()
-        self._update_status(login_status)
+        time.sleep(15)
 
-        if login_status == STATE_AUTHENTICATED:
+        status = self._make_login()
+        self._update_search_status(status)
+
+        if status == STATE_AUTHENTICATED:
             self._make_search()
 
         try:
@@ -171,8 +175,7 @@ class BaseLinkedinParser(object):
         """
         asks_verification = self._asks_code_verification()
         if asks_verification:
-            self.linkedin_search.status = STATE_ASKS_CODE
-            self.linkedin_search.save()
+            self._update_search_status(STATE_ASKS_CODE)
 
             verified = self._substitute_verification_code()
             if not verified:
@@ -188,7 +191,7 @@ class BaseLinkedinParser(object):
         Returns:
             True if code verification exist on the page, False if not
         """
-        timeout_exception_msg = 'Timed out waiting for' \
+        timeout_exception_msg = 'Timed out waiting for ' \
             'linkedin verification page'
         elem_exists = self._selenium_element_load_waiting(
             By.ID, 'verification-code',
@@ -223,73 +226,88 @@ class BaseLinkedinParser(object):
 
         return self._is_user_auth()
 
-    def _create_search_entry(self):
-        """Create new entry search with transferred search_term and search_type
+    def _create_or_update_search_entry(self):
+        """Initilize exists search entry by search id
+        or create new with specified search_term and search_type params
         """
-        self.linkedin_search = LinkedinSearch(
-            search_term=self.search_term, search_type=self.search_type)
-        self.linkedin_search.save()
+        if self.search_id:
+            try:
+                self.linkedin_search = LinkedinSearch.objects.get(
+                    pk=self.search_id)
+            except LinkedinSearch.DoesNotExist as e:
+                logger.error(e)
+        else:
+            self.linkedin_search = LinkedinSearch(
+                search_term=self.search_term, search_type=self.search_type)
+            self.linkedin_search.save()
 
-    def _update_status(self, login_status):
-        self.linkedin_search.status = login_status
+    def _update_search_status(self, status):
+        self.linkedin_search.status = status
         self.linkedin_search.save()
 
     def _make_search(self):
-        """Search by company name or company ID
+        """Make linkedin search
         """
+        if not self.linkedin_search:
+            self._update_search_status(STATE_ERROR)
+            return None
+
         self.set_employees_list_url()
-        self.linkedin_search.status = STATE_IN_PROCESS
         if not self.employees_list_url:
-            self.linkedin_search.status = STATE_ERROR
-            self.linkedin_search.save()
-            return False
+            self._update_search_status(STATE_ERROR)
+            return None
+        else:
+            self._update_search_status(STATE_IN_PROCESS)
 
-        self.linkedin_search.save()
+        start_page_number = 1
+        if self.linkedin_search.last_scraped_page:
+            start_page_number = self.linkedin_search.last_scraped_page + 1
 
-        self._get_next_list_of_employees(1)
+        self._get_next_list_of_employees(start_page_number)
 
     def _get_next_list_of_employees(self, page_numb):
         """Recursive function that call oneself if new items exists on page
         Stop if linkedin asks premium account or no items returns
         """
-        state_after_load = self._load_employees_page(page_numb)
+        load_page_status = self._load_employees_page(page_numb)
 
         file_name = '%s_%s.html' % (self.search_term, str(time.time()))
         self.save_page_to_log_if_debug(file_name)
 
-        if state_after_load == PAGE_IS_NOT_LOADED:
-            self.linkedin_search.status = STATE_CONNECTION_REFUSED
-            self.linkedin_search.save()
+        if load_page_status == PAGE_HAS_NO_RESULTS:
+            self._update_search_status(STATE_FINISHED)
+            logger.info('Search completed')
             return None
 
+        if load_page_status == PAGE_IS_NOT_LOADED:
+            self._update_search_status(STATE_CONNECTION_REFUSED)
+            return None
+
+        employees_list = self._retrive_employees_from_html()
+
+        premium_exists = self._check_premium_exists(employees_list)
+        if premium_exists and len(employees_list) == 1:
+            self._update_search_status(STATE_ASKS_PREMIUM)
+            return None
+
+        items = self._get_items(employees_list, page_numb, premium_exists)
+        self._save_items_to_db(items, page_numb)
+
+        self._get_next_list_of_employees(page_numb+1)
+
+    def _retrive_employees_from_html(self):
+        employees_list = []
         try:
             page_html = html.fromstring(self.browser.page_source)
             xp = '//li[contains(@class, "search-result__occluded-item")]'
             employees_list = page_html.xpath(xp)
         except Exception as e:
             logger.error(e)
-            self.linkedin_search.status = STATE_FINISHED
-            self.linkedin_search.save()
-            return None
 
-        premium_exists = self._check_premium_exists(employees_list)
-        if premium_exists and len(employees_list) == 1:
-            self.linkedin_search.status = STATE_ASKS_PREMIUM
-            self.linkedin_search.save()
-            return None
-
-        items = self._get_items(employees_list, page_numb, premium_exists)
-        self._save_items_to_db(items)
-
-        if employees_list:
-            self._get_next_list_of_employees(page_numb+1)
-        else:
-            self.linkedin_search.status = STATE_FINISHED
-            self.linkedin_search.save()
+        return employees_list
 
     def _check_premium_exists(self, employees_list):
         """Check if linkedin asks for premium
-
         Returns:
             True if premium block exists, False otherwise
         """
@@ -303,20 +321,18 @@ class BaseLinkedinParser(object):
 
     def _load_employees_page(self, page_numb):
         # Try to load employees page
-        if not self.employees_list_url:
-            return PAGE_URL_NOT_COMPOSED
-        else:
-            self._load_results_page_with_number(page_numb)
+        self._open_employees_url_in_browser(page_numb)
 
         first_part_loaded = self._wait_first_part_is_loaded(page_numb)
-        second_part_loaded = self._wait_second_part_is_loaded(page_numb)
-        if first_part_loaded and second_part_loaded:
-            return PAGE_IS_LOADED
-        else:
-            has_at_least_one_employee = self._page_has_at_least_one_employee(
-                page_numb)
-            if has_at_least_one_employee:
+        if first_part_loaded:
+            second_part_loaded = self._wait_second_part_is_loaded(page_numb)
+            if second_part_loaded:
                 return PAGE_IS_LOADED
+
+        has_at_least_one_employee = self._page_has_at_least_one_employee(
+            page_numb)
+        if has_at_least_one_employee:
+            return PAGE_IS_LOADED
 
         has_no_results_msg = self._page_has_no_results_msg()
         if has_no_results_msg:
@@ -324,13 +340,7 @@ class BaseLinkedinParser(object):
 
         return PAGE_IS_NOT_LOADED
 
-        # if has_no_results_msg:
-        #     return None
-
-        # if not employees_loaded:
-        #     return STATE_CONNECTION_REFUSED
-
-    def _load_results_page_with_number(self, page_numb):
+    def _open_employees_url_in_browser(self, page_numb):
         try:
             employees_url_with_page = '&'.join([
                 self.employees_list_url, 'page=%d' % page_numb])
@@ -355,7 +365,7 @@ class BaseLinkedinParser(object):
                settings.MAX_REPEAT_LINKEDIN_REQUEST):
             repeat_request_count += 1
             success_msg = 'First part of employees %d page ' \
-                'is loaded from %d retry' % (page, repeat_request_count)
+                'is loaded from %d attempt' % (page, repeat_request_count)
             elem_exists = self._selenium_element_load_waiting(
                 By.XPATH, last_el_entry,
                 success_msg=success_msg,
@@ -384,7 +394,7 @@ class BaseLinkedinParser(object):
                settings.MAX_REPEAT_LINKEDIN_REQUEST):
             repeat_request_count += 1
             success_msg = 'Employees page number %d after scroll ' \
-                'is loaded from %d retry' % (page, repeat_request_count)
+                'is loaded from %d attempt' % (page, repeat_request_count)
             elem_exists = self._selenium_element_load_waiting(
                 By.XPATH, last_el_entry, success_msg=success_msg,
                 timeout_exception_msg=timeout_excp_msg)
@@ -408,7 +418,7 @@ class BaseLinkedinParser(object):
             '"search-result__occluded-item")][1]'
 
         s_msg = 'Page number %d has at least one employee' % page
-        timeout_excp_msg = 'Timed out waiting for first page employee to load'
+        timeout_excp_msg = 'Page has no employees'
         elem_exists = self._selenium_element_load_waiting(
             By.XPATH, first_el_entry,
             success_msg=s_msg, timeout_exception_msg=timeout_excp_msg)
@@ -498,7 +508,7 @@ class BaseLinkedinParser(object):
 
         return current_company.strip()
 
-    def _save_items_to_db(self, items):
+    def _save_items_to_db(self, items, page_numb):
         # Save items (linkedin users) to db
         empls = []
         for item in items:
@@ -518,6 +528,9 @@ class BaseLinkedinParser(object):
                 location=item['location'].strip(),
                 current_company=item['current_company'].strip()))
         LinkedinSearchResult.objects.bulk_create(empls)
+
+        self.linkedin_search.last_scraped_page = page_numb
+        self.linkedin_search.save()
 
     def save_page_to_log_if_debug(self, file_name, debug=False):
         # Write html pages to project logs dir if DEBUG setting is True

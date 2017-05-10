@@ -58,6 +58,9 @@ class LinkedinSearch(models.Model):
     search_geo = models.CharField(
         default=None, null=True, blank=True,
         max_length=120, verbose_name=_('Search geo location'))
+    last_scraped_page = models.IntegerField(
+        default=None, null=True, blank=True,
+        verbose_name=_('Last scraped employees page'))
 
     def as_dict(self):
         date_created = self.date_created.strftime("%Y-%m-%d %H:%M:%S")

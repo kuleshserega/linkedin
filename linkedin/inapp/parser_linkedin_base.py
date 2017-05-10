@@ -20,6 +20,11 @@ from models import LinkedinSearch, LinkedinSearchResult, LinkedinUser, \
 
 logger = logging.getLogger('linkedin_parser')
 
+PAGE_HAS_NO_RESULTS = 1
+PAGE_IS_LOADED = 2
+PAGE_IS_NOT_LOADED = 3
+PAGE_URL_NOT_COMPOSED = 4
+
 
 class BaseLinkedinParser(object):
     login_url = 'https://www.linkedin.com/uas/login?goback=&trk=hb_signin'
@@ -248,7 +253,11 @@ class BaseLinkedinParser(object):
         Stop if linkedin asks premium account or no items returns
         """
         state_after_load = self._load_employees_page(page_numb)
-        if state_after_load == STATE_CONNECTION_REFUSED:
+
+        file_name = '%s_%s.html' % (self.search_term, str(time.time()))
+        self.save_page_to_log_if_debug(file_name)
+
+        if state_after_load == PAGE_IS_NOT_LOADED:
             self.linkedin_search.status = STATE_CONNECTION_REFUSED
             self.linkedin_search.save()
             return None
@@ -293,29 +302,120 @@ class BaseLinkedinParser(object):
         return False
 
     def _load_employees_page(self, page_numb):
-        # Try to load employees page MAX_REPEAT_LINKEDIN_REQUEST times
-        employees_loaded = self._wait_for_page_is_loaded(page_numb)
-        repeat_request_count = 0
-        has_no_results_msg = False
-        while (not employees_loaded and repeat_request_count <
-               settings.MAX_REPEAT_LINKEDIN_REQUEST):
-            has_no_results_msg = self._page_has_no_results_msg()
-            if has_no_results_msg:
-                break
+        # Try to load employees page
+        if not self.employees_list_url:
+            return PAGE_URL_NOT_COMPOSED
+        else:
+            self._load_results_page_with_number(page_numb)
 
-            employees_loaded = self._wait_for_page_is_loaded(page_numb)
-            repeat_request_count += 1
-            logger.info('Current retry to load page number %d: %s'
-                        % (page_numb, repeat_request_count))
+        first_part_loaded = self._wait_first_part_is_loaded(page_numb)
+        second_part_loaded = self._wait_second_part_is_loaded(page_numb)
+        if first_part_loaded and second_part_loaded:
+            return PAGE_IS_LOADED
+        else:
+            has_at_least_one_employee = self._page_has_at_least_one_employee(
+                page_numb)
+            if has_at_least_one_employee:
+                return PAGE_IS_LOADED
 
-        file_name = '%s_%s.html' % (self.search_term, str(time.time()))
-        self.save_page_to_log_if_debug(file_name)
-
+        has_no_results_msg = self._page_has_no_results_msg()
         if has_no_results_msg:
-            return None
+            return PAGE_HAS_NO_RESULTS
 
-        if not employees_loaded:
-            return STATE_CONNECTION_REFUSED
+        return PAGE_IS_NOT_LOADED
+
+        # if has_no_results_msg:
+        #     return None
+
+        # if not employees_loaded:
+        #     return STATE_CONNECTION_REFUSED
+
+    def _load_results_page_with_number(self, page_numb):
+        try:
+            employees_url_with_page = '&'.join([
+                self.employees_list_url, 'page=%d' % page_numb])
+            self.browser.get(employees_url_with_page)
+        except Exception as e:
+            logger.error(e)
+
+    def _wait_first_part_is_loaded(self, page):
+        """Waiting for first part employees page loaded in selenium browser
+
+        Returns:
+            True if first part of page has been loaded, False if not
+        """
+        timeout_exception_msg = 'Timed out waiting for ' \
+            'employees page number %d to load' % page
+        last_el_entry = '//li[contains(@class, ' \
+            '"search-result__occluded-item")][5]'
+
+        elem_exists = False
+        repeat_request_count = 0
+        while (not elem_exists and repeat_request_count <
+               settings.MAX_REPEAT_LINKEDIN_REQUEST):
+            repeat_request_count += 1
+            success_msg = 'First part of employees %d page ' \
+                'is loaded from %d retry' % (page, repeat_request_count)
+            elem_exists = self._selenium_element_load_waiting(
+                By.XPATH, last_el_entry,
+                success_msg=success_msg,
+                timeout_exception_msg=timeout_exception_msg)
+
+        if not elem_exists:
+            return False
+        return True
+
+    def _wait_second_part_is_loaded(self, page):
+        """Waiting for second part of employees page loaded
+
+        Returns:
+            True part has been loaded, False otherwise
+        """
+        self._scroll_employees_page()
+
+        last_el_entry = '//li[contains(@class, ' \
+            '"search-result__occluded-item")][10]/' \
+            'div/div[contains(@class, "search-result__wrapper")]'
+        timeout_excp_msg = 'Timed out waiting for all employees to load'
+
+        elem_exists = False
+        repeat_request_count = 0
+        while (not elem_exists and repeat_request_count <
+               settings.MAX_REPEAT_LINKEDIN_REQUEST):
+            repeat_request_count += 1
+            success_msg = 'Employees page number %d after scroll ' \
+                'is loaded from %d retry' % (page, repeat_request_count)
+            elem_exists = self._selenium_element_load_waiting(
+                By.XPATH, last_el_entry, success_msg=success_msg,
+                timeout_exception_msg=timeout_excp_msg)
+
+        if not elem_exists:
+            return False
+        return True
+
+    def _scroll_employees_page(self):
+        """After scrolling page in browser
+        new employees are becoming available
+        """
+        try:
+            self.browser.execute_script(
+                "window.scrollTo(0, document.body.scrollHeight);")
+        except Exception as e:
+            logger.error(e)
+
+    def _page_has_at_least_one_employee(self, page):
+        first_el_entry = '//li[contains(@class, ' \
+            '"search-result__occluded-item")][1]'
+
+        s_msg = 'Page number %d has at least one employee' % page
+        timeout_excp_msg = 'Timed out waiting for first page employee to load'
+        elem_exists = self._selenium_element_load_waiting(
+            By.XPATH, first_el_entry,
+            success_msg=s_msg, timeout_exception_msg=timeout_excp_msg)
+
+        if not elem_exists:
+            return False
+        return True
 
     def _page_has_no_results_msg(self):
         """
@@ -338,50 +438,65 @@ class BaseLinkedinParser(object):
         """Get all items(linkedin users) from loaded employees page
 
         Returns:
-            Items list, None if has errors in parse data with xpath
+            Items list, empty list if has errors in parse data with xpath
         """
         items = []
         for i, employee in enumerate(employees_list):
             if premium_exists and i == 0:
                 continue
 
-            try:
-                full_name = employee.xpath(
-                    './/span[contains(@class, "actor-name")]/text()')[0]
-            except Exception:
-                full_name = None
-                logger.error('Full name is not found in entry')
+            full_name = self._get_full_name(employee)
+            if not full_name:
                 continue
-
-            try:
-                title = employee.xpath(
-                    './/p[contains(@class, "subline-level-1")]/text()')[0]
-            except Exception:
-                title = None
-
-            try:
-                location = employee.xpath(
-                    './/p[contains(@class, "subline-level-2")]/text()')[0]
-            except Exception:
-                location = None
-
-            company_xpath = './/p[contains(@class, ' \
-                '"search-result__snippets")]//text()'
-            try:
-                current_company = employee.xpath(company_xpath)
-                current_company = ' '.join(
-                    current_company).replace('Current:', '')
-            except Exception:
-                current_company = ''
 
             items.append({
                 'full_name': full_name,
-                'title': title,
-                'location': location,
-                'current_company': current_company.strip()})
+                'title': self._get_title(employee),
+                'location': self._get_location(employee),
+                'current_company': self._get_current_company(employee)})
 
         logger.info('Add %d items from page number %d' % (len(items), npage))
         return items
+
+    def _get_full_name(self, employee):
+        try:
+            full_name = employee.xpath(
+                './/span[contains(@class, "actor-name")]/text()')[0]
+        except Exception:
+            full_name = None
+            logger.error('Full name is not found in entry')
+
+        return full_name
+
+    def _get_title(self, employee):
+        try:
+            title = employee.xpath(
+                './/p[contains(@class, "subline-level-1")]/text()')[0]
+        except Exception:
+            title = None
+
+        return title
+
+    def _get_location(self, employee):
+        try:
+            location = employee.xpath(
+                './/p[contains(@class, "subline-level-2")]/text()')[0]
+        except Exception:
+            location = None
+
+        return location
+
+    def _get_current_company(self, employee):
+        company_xpath = './/p[contains(@class, ' \
+            '"search-result__snippets")]//text()'
+        try:
+            current_company = employee.xpath(company_xpath)
+            current_company = ' '.join(
+                current_company).replace('Current:', '')
+        except Exception:
+            current_company = ''
+
+        return current_company.strip()
 
     def _save_items_to_db(self, items):
         # Save items (linkedin users) to db
@@ -403,85 +518,6 @@ class BaseLinkedinParser(object):
                 location=item['location'].strip(),
                 current_company=item['current_company'].strip()))
         LinkedinSearchResult.objects.bulk_create(empls)
-
-    def _wait_for_page_is_loaded(self, page):
-        """Waiting for employees page loaded in selenium browser
-
-        Returns:
-            True if all page has been loaded,
-            False if one of the page parts was not loaded or no results found
-        """
-        if not self.employees_list_url:
-            return False
-
-        try:
-            employees_url_with_page = '&'.join([
-                self.employees_list_url, 'page=%d' % page])
-            self.browser.get(employees_url_with_page)
-        except Exception as e:
-            logger.error(e)
-
-        success_msg = 'First part of employees %d page is loaded' % page
-        timeout_exception_msg = 'Timed out waiting for ' \
-            'employees page number %d to load' % page
-        last_el_entry = '//li[contains(@class, ' \
-            '"search-result__occluded-item")][5]'
-        elem_exists = self._selenium_element_load_waiting(
-            By.XPATH, last_el_entry,
-            success_msg=success_msg,
-            timeout_exception_msg=timeout_exception_msg)
-
-        if not elem_exists:
-            return False
-
-        is_loaded = self._wait_second_part_is_loaded(page)
-        if not is_loaded:
-            return False
-        return True
-
-    def _wait_second_part_is_loaded(self, page):
-        """Waiting for second part of employees page loaded
-
-        Returns:
-            True part has been loaded, False otherwise
-        """
-        try:
-            self.browser.execute_script(
-                "window.scrollTo(0, document.body.scrollHeight);")
-        except Exception as e:
-            logger.error(e)
-
-        last_el_entry = '//li[contains(@class, ' \
-            '"search-result__occluded-item")][10]/' \
-            'div/div[contains(@class, "search-result__wrapper")]'
-
-        s_msg = 'Employees page number %d after scroll is loaded' % page
-        timeout_excp_msg = 'Timed out waiting for all employees to load'
-        elem_exists = self._selenium_element_load_waiting(
-            By.XPATH, last_el_entry,
-            success_msg=s_msg, timeout_exception_msg=timeout_excp_msg)
-
-        at_least_one_employee_exists = self._page_has_at_least_one_employee(
-                                            page)
-
-        if not elem_exists and not at_least_one_employee_exists:
-            return False
-
-        return True
-
-    def _page_has_at_least_one_employee(self, page):
-        first_el_entry = '//li[contains(@class, ' \
-            '"search-result__occluded-item")][1]'
-
-        s_msg = 'Page number %d has at least one employee' % page
-        timeout_excp_msg = 'Timed out waiting for first page employee to load'
-        elem_exists = self._selenium_element_load_waiting(
-            By.XPATH, first_el_entry,
-            success_msg=s_msg, timeout_exception_msg=timeout_excp_msg)
-
-        if not elem_exists:
-            return False
-        return True
 
     def save_page_to_log_if_debug(self, file_name, debug=False):
         # Write html pages to project logs dir if DEBUG setting is True

@@ -461,9 +461,26 @@ class BaseLinkedinParser(object):
             By.XPATH, last_el_entry,
             success_msg=s_msg, timeout_exception_msg=timeout_excp_msg)
 
-        if not elem_exists:
+        at_least_one_employee_exists = self._page_has_at_least_one_employee(
+                                            page)
+
+        if not elem_exists and not at_least_one_employee_exists:
             return False
 
+        return True
+
+    def _page_has_at_least_one_employee(self, page):
+        first_el_entry = '//li[contains(@class, ' \
+            '"search-result__occluded-item")][1]'
+
+        s_msg = 'Page number %d has at least one employee' % page
+        timeout_excp_msg = 'Timed out waiting for first page employee to load'
+        elem_exists = self._selenium_element_load_waiting(
+            By.XPATH, first_el_entry,
+            success_msg=s_msg, timeout_exception_msg=timeout_excp_msg)
+
+        if not elem_exists:
+            return False
         return True
 
     def save_page_to_log_if_debug(self, file_name, debug=False):

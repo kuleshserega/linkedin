@@ -100,7 +100,7 @@ def get_linkedin_employees_csv(request, pk):
 
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = \
-        'attachment; filename="%s_employees.csv"' % s.search_company
+        'attachment; filename="%s_employees.csv"' % s.search_term
 
     writer = csv.writer(response)
 

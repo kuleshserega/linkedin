@@ -23,11 +23,11 @@ $(document).ready(function(){
     });
   });
 
-  $('body').on('click', '#restart-task', function(e){
+  $('body').on('click', '#update-task', function(e){
     e.preventDefault();
     var task_nmb = $(this).attr('task-nmb');
     $.ajax({
-      url: '/restart-task/' + task_nmb + '/',
+      url: '/update-task/' + task_nmb + '/',
       method: 'GET',
       success: function(data){
         show_msg(data);
@@ -98,8 +98,8 @@ $(document).ready(function(){
     var search_type = '';
     if(row['search_type']){ search_type = row['search_type']; }
 
-    var restart_search_button = '';
-    if(row['status'] == 10){ restart_search_button = '<a id="restart-task" class="btn" task-nmb="' + row['id'] + '">restart</a>'; }
+    var update_search_button = '';
+    if(row['status'] == 10){ update_search_button = '<a id="update-task" class="btn" task-nmb="' + row['id'] + '">Update</a>'; }
 
     var row_template_html = '<tr>' +
       '<td>' + row['id'] + '</td>' +
@@ -108,7 +108,7 @@ $(document).ready(function(){
       '<td>' + search_geo + '</td>' +
       '<td>' + search_type + '</td>' +
       '<td>' + row['date_created'] + '</td>' +
-      '<td><span title="' + row['status_text'] + '" class="center glyphicon ' + row['status_icon'] + '"></span>' + restart_search_button + '</td>' +
+      '<td><span title="' + row['status_text'] + '" class="center glyphicon ' + row['status_icon'] + '"></span>' + update_search_button + '</td>' +
       '<td><a title="Search details" target="_blank" class="center" href="' + row['search_details_url'] + '"><img width=25 src="/static/img/details.png" /></a></td>' +
       '<td><a title="Save to CSV" class="center" href="' + row['employees_to_csv'] + '"><img width=25 src="/static/img/save.png" /></a></td>' +
     '</tr>';

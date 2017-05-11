@@ -5,6 +5,7 @@ import logging
 from selenium.webdriver.common.by import By
 
 from parser_linkedin_base import BaseLinkedinParser
+from models import LinkedinSearch
 
 logger = logging.getLogger('linkedin_parser')
 
@@ -16,19 +17,30 @@ class LinkedinParserByGeo(BaseLinkedinParser):
     SEARCH_BY_KEYWORD_URL = 'search/results/people/?keywords=%s' \
         '&origin=FACETED_SEARCH'
 
-    def __init__(self, search_term, search_type, search_geo=None,
-                 search_id=None, *args, **kwargs):
-        super(LinkedinParserByGeo, self).__init__(
-            search_term, search_type, search_id, *args, **kwargs)
-        url_part_with_keyword = self.SEARCH_BY_KEYWORD_URL % self.search_term
-        self.base_supervisors_url = self.BASE_URL % url_part_with_keyword
-        self.search_geo = search_geo
+    def __init__(self, *args, **kwargs):
+        super(LinkedinParserByGeo, self).__init__(*args, **kwargs)
+
+    def create_new_linkedin_search(self, search_term, search_type, search_geo):
+        """Should create new linkedin_search
+        """
+        self.search_term = search_term
+
+        self.linkedin_search = LinkedinSearch(
+            search_term=self.search_term,
+            search_type=search_type,
+            search_geo=search_geo)
+        self.linkedin_search.save()
+
+    def update_existing_linkedin_search(self, search_id):
+        """Should init existing linkedin_search
+        """
+        try:
+            self.linkedin_search = LinkedinSearch.objects.get(pk=search_id)
+            self.search_term = self.linkedin_search.search_term
+        except LinkedinSearch.DoesNotExist as e:
+            logger.error(e)
 
     def set_employees_list_url(self):
-        if not self.search_id:
-            self.linkedin_search.search_geo = self.search_geo
-            self.linkedin_search.save()
-
         result = self._set_region_on_search_page()
         if result:
             self.employees_list_url = self._compose_employees_list_url()
@@ -64,8 +76,11 @@ class LinkedinParserByGeo(BaseLinkedinParser):
         return True
 
     def _load_base_geo_page(self):
+        url_part_with_keyword = self.SEARCH_BY_KEYWORD_URL % self.search_term
+        self.search_people_url = self.BASE_URL % url_part_with_keyword
+
         try:
-            self.browser.get(self.base_supervisors_url)
+            self.browser.get(self.search_people_url)
         except Exception as e:
             logger.error(e)
 

@@ -12,10 +12,10 @@ from selenium.webdriver.common.by import By
 
 from django.conf import settings
 
-from models import LinkedinSearch, LinkedinSearchResult, LinkedinUser, \
+from models import LinkedinSearchResult, LinkedinUser, \
     STATE_IN_PROCESS, STATE_FINISHED, STATE_AUTHENTICATED, \
     STATE_ASKS_CODE, STATE_CODE_NOT_VALID, STATE_LINKEDIN_USER_EMPTY, \
-    STATE_ERROR, STATE_ASKS_PREMIUM, STATE_NOT_LOGGED_IN, SEARCH_BY_COMPANY, \
+    STATE_ERROR, STATE_ASKS_PREMIUM, STATE_NOT_LOGGED_IN, \
     STATE_CONNECTION_REFUSED
 
 logger = logging.getLogger('linkedin_parser')
@@ -29,6 +29,8 @@ PAGE_URL_NOT_COMPOSED = 4
 class BaseLinkedinParser(object):
     login_url = 'https://www.linkedin.com/uas/login?goback=&trk=hb_signin'
     linkedin_search = None
+    search_status = None
+    search_term = None
     employees_list_url = None
     user = None
 
@@ -38,25 +40,27 @@ class BaseLinkedinParser(object):
     LINKEDIN_URL = 'https://www.linkedin.com/'
     BASE_URL = 'https://www.linkedin.com/%s'
 
-    def __init__(self, search_term='adidas', search_type=SEARCH_BY_COMPANY,
-                 search_id=None, *args, **kwargs):
-        super(BaseLinkedinParser, self).__init__(*args, **kwargs)
-        self.search_term = search_term
-        self.search_type = search_type
-
+    def __init__(self, *args, **kwargs):
         self.user = self._get_linkedin_user()
-
-        self.search_id = search_id
-        self._create_or_update_search_entry()
 
         self.browser = webdriver.PhantomJS()
         self.browser.set_window_size(1024, 768)
+
+    def create_new_linkedin_search(self):
+        """Should create new linkedin_search
+        """
+        raise NotImplementedError('Should be override')
+
+    def update_existing_linkedin_search(self):
+        """Should init existing linkedin_search
+        """
+        raise NotImplementedError('Should be override')
 
     def set_employees_list_url(self):
         """Need to set employees_list_url that will be used
         with further collection of employees
         """
-        raise NotImplementedError('set_employees_list_url should be override')
+        raise NotImplementedError('Should be override')
 
     def _get_linkedin_user(self):
         """
@@ -96,41 +100,59 @@ class BaseLinkedinParser(object):
 
         return True
 
-    def parse(self):
-        """Use selenium to authenticate and load linkedin page
-        """
-        try:
-            self.browser.get(self.login_url)
-        except Exception as e:
-            logger.error(e)
+    def _update_search_status(self, status):
+        self.search_status = status
 
-        time.sleep(15)
+        self.linkedin_search.status = status
+        self.linkedin_search.save()
 
-        status = self._make_login()
-        self._update_search_status(status)
-
-        if status == STATE_AUTHENTICATED:
-            self._make_search()
-
+    def _close_selenium_browser(self):
         try:
             self.browser.service.process.send_signal(signal.SIGTERM)
             self.browser.quit()
         except OSError as e:
             logger.error(e)
 
+    def parse(self):
+        """Use selenium to authenticate and load linkedin page
+        """
+        if self.linkedin_search:
+            self._open_login_page()
+            self._make_login()
+            self._make_search()
+
+        self._close_selenium_browser()
+
+    def _open_login_page(self):
+        try:
+            self.browser.get(self.login_url)
+        except Exception as e:
+            logger.error(e)
+
+        self._selenium_element_load_waiting(
+            By.ID, 'btn-primary',
+            success_msg='Login page loaded',
+            timeout_exception_msg='Timed out waiting login page open')
+
     def _make_login(self):
         """Try to authenticate with selenium browser
-
-        Returns:
-            Status of authentication
         """
+        self._post_login_data_with_selenium()
+
+        is_authenticated = self._is_user_auth()
+        if not is_authenticated:
+            self._try_verification_code_from_db()
+        else:
+            self._update_search_status(STATE_AUTHENTICATED)
+
+    def _post_login_data_with_selenium(self):
         try:
             email = self.browser.find_element_by_id("session_key-login")
             password = self.browser.find_element_by_id(
                 "session_password-login")
 
             if not self.user:
-                return STATE_LINKEDIN_USER_EMPTY
+                self._update_search_status(STATE_LINKEDIN_USER_EMPTY)
 
             email.send_keys(self.user.email)
             password.send_keys(self.user.password)
@@ -140,14 +162,6 @@ class BaseLinkedinParser(object):
             button_login.click()
         except Exception as e:
             logger.error(e)
-
-        is_authenticated = self._is_user_auth()
-        if not is_authenticated:
-            search_status = self._get_search_status()
-            if search_status:
-                return search_status
-
-        return STATE_AUTHENTICATED
 
     def _is_user_auth(self):
         """Check substituted in selenium user is authenticated on linkedin
@@ -167,7 +181,7 @@ class BaseLinkedinParser(object):
             return False
         return True
 
-    def _get_search_status(self):
+    def _try_verification_code_from_db(self):
         """Check status of the running search
 
         Returns:
@@ -179,11 +193,9 @@ class BaseLinkedinParser(object):
 
             verified = self._substitute_verification_code()
             if not verified:
-                return STATE_CODE_NOT_VALID
+                self._update_search_status(STATE_CODE_NOT_VALID)
         else:
-            return STATE_NOT_LOGGED_IN
-
-        return None
+            self._update_search_status(STATE_NOT_LOGGED_IN)
 
     def _asks_code_verification(self):
         """For case when linkedin has been asked for code verification
@@ -226,28 +238,12 @@ class BaseLinkedinParser(object):
 
         return self._is_user_auth()
 
-    def _create_or_update_search_entry(self):
-        """Initilize exists search entry by search id
-        or create new with specified search_term and search_type params
-        """
-        if self.search_id:
-            try:
-                self.linkedin_search = LinkedinSearch.objects.get(
-                    pk=self.search_id)
-            except LinkedinSearch.DoesNotExist as e:
-                logger.error(e)
-        else:
-            self.linkedin_search = LinkedinSearch(
-                search_term=self.search_term, search_type=self.search_type)
-            self.linkedin_search.save()
-
-    def _update_search_status(self, status):
-        self.linkedin_search.status = status
-        self.linkedin_search.save()
-
     def _make_search(self):
         """Make linkedin search
         """
+        if self.search_status is not STATE_AUTHENTICATED:
+            return None
+
         if not self.linkedin_search:
             self._update_search_status(STATE_ERROR)
             return None

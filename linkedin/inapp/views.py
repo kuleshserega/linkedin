@@ -102,10 +102,9 @@ def get_linkedin_employees_csv(request, pk):
     response['Content-Disposition'] = \
         'attachment; filename="%s_employees.csv"' % s.search_term
 
-    writer = csv.writer(response)
-
     qs = LinkedinSearchResult.objects.filter(search_id=s.id).order_by('id')
 
+    writer = csv.writer(response)
     writer.writerow([
         'ID SEARCH RESULT', 'FIRST NAME', 'LAST NAME', 'TITLE', 'LOCATION'])
     for row in qs:

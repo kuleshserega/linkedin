@@ -8,6 +8,7 @@ from django.conf import settings
 from django.utils.http import urlquote
 
 from parser_linkedin_base import BaseLinkedinParser
+from models import LinkedinSearch
 
 logger = logging.getLogger('linkedin_parser')
 
@@ -21,6 +22,24 @@ class LinkedinParserByCompany(BaseLinkedinParser):
         super(LinkedinParserByCompany, self).__init__(*args, **kwargs)
         self.search_company_url = self.BASE_URL % self.SEARCH_COMPANY_URL
         self.base_employees_url = self.BASE_URL % self.COMPANY_EMPLOYEES_URL
+
+    def create_new_linkedin_search(self, search_term, search_type):
+        """Should create new linkedin_search
+        """
+        self.search_term = search_term
+
+        self.linkedin_search = LinkedinSearch(
+            search_term=self.search_term, search_type=search_type)
+        self.linkedin_search.save()
+
+    def update_existing_linkedin_search(self, search_id):
+        """Should init existing linkedin_search
+        """
+        try:
+            self.linkedin_search = LinkedinSearch.objects.get(pk=search_id)
+            self.search_term = self.linkedin_search.search_term
+        except LinkedinSearch.DoesNotExist as e:
+            logger.error(e)
 
     def set_employees_list_url(self):
         self._set_linkedin_search_company_id()

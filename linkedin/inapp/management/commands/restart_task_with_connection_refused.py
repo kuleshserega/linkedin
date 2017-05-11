@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 from django.core.management.base import BaseCommand, CommandError
 
-from inapp.tasks import create_linkedin_search
+from inapp.tasks import update_linkedin_search
 from inapp.models import LinkedinSearch, STATE_CONNECTION_REFUSED, \
     STATE_TASK_RESTARTED
 
@@ -35,11 +35,4 @@ class Command(BaseCommand):
         linkedin_search.status = STATE_TASK_RESTARTED
         linkedin_search.save()
 
-        search_geo = None
-        if linkedin_search.search_geo:
-            search_geo = linkedin_search.search_geo
-
-        create_linkedin_search.delay(
-            linkedin_search.search_term,
-            linkedin_search.search_type,
-            search_geo)
+        update_linkedin_search.delay(linkedin_search.id)

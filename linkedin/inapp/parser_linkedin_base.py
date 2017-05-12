@@ -142,8 +142,6 @@ class BaseLinkedinParser(object):
         is_authenticated = self._is_user_auth()
         if not is_authenticated:
             self._try_verification_code_from_db()
-        else:
-            self._update_search_status(STATE_AUTHENTICATED)
 
     def _post_login_data_with_selenium(self):
         try:
@@ -177,9 +175,11 @@ class BaseLinkedinParser(object):
         file_name = 'auth_%s_%s.html' % (self.search_term, str(time.time()))
         self.save_page_to_log_if_debug(file_name)
 
-        if not elem_exists:
+        if elem_exists:
+            self._update_search_status(STATE_AUTHENTICATED)
+            return True
+        else:
             return False
-        return True
 
     def _try_verification_code_from_db(self):
         """Check status of the running search
